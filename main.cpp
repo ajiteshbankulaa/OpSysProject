@@ -33,7 +33,7 @@ double next_exp(double lambda, int upperBound) {
         }
         
         x = -log(r)/lambda;
-       // cout<<x<<endl;
+        cout<<x<<endl;
     } 
 
     return x;
@@ -68,6 +68,27 @@ void printProcess(Process& p) {
     }
 
     cout<<endl;
+}
+
+void printProcess2(Process& p) {
+
+    vector<int>& cpu = p.getCpuBursts();
+    vector<int>& io = p.getIoBursts();
+
+    if (p.isIoBound()){
+        cout<<"I/O-bound process "<<p.getId()<<": arrival time "<<p.getArrivalTime()<<"ms; "<<cpu.size()<<" "<<(cpu.size() == 1 ? "CPU burst" : "CPU bursts")<<":"<<endl;
+    }else{
+        cout<<"CPU-bound process "<<p.getId()<<": arrival time "<<p.getArrivalTime()<<"ms; "<<cpu.size()<<" "<<(cpu.size() == 1 ? "CPU burst" : "CPU bursts")<<":"<<endl;
+    }
+
+    for(size_t i = 0; i < cpu.size(); i++){
+        if(i < io.size()){
+            cout<<"==> CPU burst "<<cpu[i]<<"ms ==> I/O burst "<<io[i]<<"ms"<<endl;
+        }else{
+            cout<<"==> CPU burst "<<cpu[i]<<"ms"<<endl;
+        }
+    }
+
 }
 
 //generate one  process
@@ -198,7 +219,11 @@ int main(int argc, char* argv[]) {
 
     //print all the processes stuffs
     for(size_t i = 0; i<processes.size(); i++){
-        printProcess(processes[i]);
+        if(i != processes.size() - 1){
+            printProcess(processes[i]); 
+        }else{
+            printProcess2(processes[i]);
+        }
     }
 
     return 0;
