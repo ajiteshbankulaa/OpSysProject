@@ -33,7 +33,7 @@ double next_exp(double lambda, int upperBound) {
         }
         
         x = -log(r)/lambda;
-        cout<<x<<endl;
+        //cout<<x<<endl;
     } 
 
     return x;
