@@ -12,12 +12,18 @@ using namespace std;
 //need rand in like the range [0,1) for the exp dist so yea cus yea
 double uniform_rand() {
     //Static Cast :O!!!
-    return static_cast<double>(rand())/(static_cast<double>(RAND_MAX) + 1.0);
+    //return static_cast<double>(rand())/(static_cast<double>(RAND_MAX) + 1.0);
+    return drand48();
 }
 
 // exp dist helper, redo over and over untill in the bounds thats less than upper
 double next_exp(double lambda, int upperBound) {
     double x;
+    double r = uniform_rand();
+    while (r == 0.0){
+        r = uniform_rand();
+    }
+    x = -log(r)/lambda;
 
     while (x > upperBound){
         double r = uniform_rand();
@@ -25,8 +31,9 @@ double next_exp(double lambda, int upperBound) {
         while (r == 0.0){
             r = uniform_rand();
         }
-
+        
         x = -log(r)/lambda;
+       // cout<<x<<endl;
     } 
 
     return x;
@@ -164,7 +171,7 @@ int main(int argc, char* argv[]) {
     }
 
     //seed the normal rand() with seed
-    srand(seed);
+    srand48(seed);
 
     //print the top summary lines
     cout<<"<<< -- process set (n="<<n<<") with "<<cpuBoundCount<<" CPU-bound "<<(cpuBoundCount == 1 ? "process" : "processes")<<endl;
