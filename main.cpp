@@ -4,6 +4,7 @@
 #include <cmath>
 #include <cstdlib>
 #include <iomanip>
+#include <fstream>
 #include <stdexcept>
 #include "Simulator.h"
 
@@ -47,48 +48,86 @@ string makeProcessId(int index) {
     return string(1, letter) + to_string(digit);
 }
 
-//prnt singluar instance of a process in the format
+// print one process in the summary format
 void printProcess(Process& p) {
-
     vector<int>& cpu = p.getCpuBursts();
-    vector<int>& io = p.getIoBursts();
 
     if (p.isIoBound()){
-        cout<<"I/O-bound process "<<p.getId()<<": arrival time "<<p.getArrivalTime()<<"ms; "<<cpu.size()<<" "<<(cpu.size() == 1 ? "CPU burst" : "CPU bursts")<<":"<<endl;
+        cout<<"I/O-bound process "<<p.getId()<<": arrival time "<<p.getArrivalTime()<<"ms; "<<cpu.size()<<" "<<(cpu.size() == 1 ? "CPU burst" : "CPU bursts")<<endl;
     }else{
-        cout<<"CPU-bound process "<<p.getId()<<": arrival time "<<p.getArrivalTime()<<"ms; "<<cpu.size()<<" "<<(cpu.size() == 1 ? "CPU burst" : "CPU bursts")<<":"<<endl;
+        cout<<"CPU-bound process "<<p.getId()<<": arrival time "<<p.getArrivalTime()<<"ms; "<<cpu.size()<<" "<<(cpu.size() == 1 ? "CPU burst" : "CPU bursts")<<endl;
     }
-
-    for(size_t i = 0; i < cpu.size(); i++){
-        if(i < io.size()){
-            cout<<"==> CPU burst "<<cpu[i]<<"ms ==> I/O burst "<<io[i]<<"ms"<<endl;
-        }else{
-            cout<<"==> CPU burst "<<cpu[i]<<"ms"<<endl;
-        }
-    }
-
-    cout<<endl;
 }
 
-void printProcess2(Process& p) {
-
-    vector<int>& cpu = p.getCpuBursts();
-    vector<int>& io = p.getIoBursts();
-
-    if (p.isIoBound()){
-        cout<<"I/O-bound process "<<p.getId()<<": arrival time "<<p.getArrivalTime()<<"ms; "<<cpu.size()<<" "<<(cpu.size() == 1 ? "CPU burst" : "CPU bursts")<<":"<<endl;
-    }else{
-        cout<<"CPU-bound process "<<p.getId()<<": arrival time "<<p.getArrivalTime()<<"ms; "<<cpu.size()<<" "<<(cpu.size() == 1 ? "CPU burst" : "CPU bursts")<<":"<<endl;
+double computeAverage(long long total, int count) {
+    if (count == 0) {
+        return 0.0;
     }
 
-    for(size_t i = 0; i < cpu.size(); i++){
-        if(i < io.size()){
-            cout<<"==> CPU burst "<<cpu[i]<<"ms ==> I/O burst "<<io[i]<<"ms"<<endl;
-        }else{
-            cout<<"==> CPU burst "<<cpu[i]<<"ms"<<endl;
+    return static_cast<double>(total) / static_cast<double>(count);
+}
+
+
+
+//the file shit
+void writeSimout(vector<Process>& processes, int cpuBoundCount) {
+    //open fil
+    ofstream simout("simout.txt");
+
+    long long cpuBoundCpuTotal = 0;
+    long long ioBoundCpuTotal = 0;
+    long long cpuBoundIoTotal = 0;
+    long long ioBoundIoTotal = 0;
+    int cpuBoundCpuCount = 0;
+    int ioBoundCpuCount = 0;
+    int cpuBoundIoCount = 0;
+    int ioBoundIoCount = 0;
+
+    // loop through all processes and add up the totals and counts for cpu and io bursts for both cpu-bound and io-bound processes
+    for (Process& process : processes) {
+        vector<int>& cpuBursts = process.getCpuBursts();
+        vector<int>& ioBursts = process.getIoBursts();
+
+        if (process.isIoBound()) {
+            for (int burst : cpuBursts) {
+                ioBoundCpuTotal += burst;
+                ioBoundCpuCount++;
+            }
+
+            for (int burst : ioBursts) {
+                ioBoundIoTotal += burst;
+                ioBoundIoCount++;
+            }
+        } else {
+            for (int burst : cpuBursts) {
+                cpuBoundCpuTotal += burst;
+                cpuBoundCpuCount++;
+            }
+
+            for (int burst : ioBursts) {
+                cpuBoundIoTotal += burst;
+                cpuBoundIoCount++;
+            }
         }
     }
 
+    int ioBoundCount = static_cast<int>(processes.size()) - cpuBoundCount;
+    long long overallCpuTotal = cpuBoundCpuTotal + ioBoundCpuTotal;
+    long long overallIoTotal = cpuBoundIoTotal + ioBoundIoTotal;
+    int overallCpuCount = cpuBoundCpuCount + ioBoundCpuCount;
+    int overallIoCount = cpuBoundIoCount + ioBoundIoCount;
+
+    //print this stuff to simout.txt 
+    simout<<fixed<<setprecision(2);
+    simout<<"-- number of processes: "<<processes.size()<<endl;
+    simout<<"-- number of CPU-bound processes: "<<cpuBoundCount<<endl;
+    simout<<"-- number of I/O-bound processes: "<<ioBoundCount<<endl;
+    simout<<"-- CPU-bound average CPU burst time: "<<computeAverage(cpuBoundCpuTotal, cpuBoundCpuCount)<<" ms"<<endl;
+    simout<<"-- I/O-bound average CPU burst time: "<<computeAverage(ioBoundCpuTotal, ioBoundCpuCount)<<" ms"<<endl;
+    simout<<"-- overall average CPU burst time: "<<computeAverage(overallCpuTotal, overallCpuCount)<<" ms"<<endl;
+    simout<<"-- CPU-bound average I/O burst time: "<<computeAverage(cpuBoundIoTotal, cpuBoundIoCount)<<" ms"<<endl;
+    simout<<"-- I/O-bound average I/O burst time: "<<computeAverage(ioBoundIoTotal, ioBoundIoCount)<<" ms"<<endl;
+    simout<<"-- overall average I/O burst time: "<<computeAverage(overallIoTotal, overallIoCount)<<" ms"<<endl;
 }
 
 //generate one  process
@@ -219,9 +258,9 @@ int main(int argc, char* argv[]) {
     srand48(seed);
 
     //print the top summary lines
-    cout<<"<<< -- process set (n="<<n<<") with "<<cpuBoundCount<<" CPU-bound "<<(cpuBoundCount == 1 ? "process" : "processes")<<endl;
-    cout<<"<<< -- seed="<<seed<<"; lambda="<<fixed<<setprecision(6)<<lambda<<"; upper bound="<<upperBound<<endl;
-    cout<<endl;
+    cout<<"<<<-- process set (n="<<n<<") with "<<cpuBoundCount<<" CPU-bound "<<(cpuBoundCount == 1 ? "process" : "processes")<<endl;
+    cout<<"<<<-- seed="<<seed<<"; lambda="<<fixed<<setprecision(6)<<lambda<<"; upper bound="<<upperBound<<endl;
+    cout<<"<<<-- t_cs="<<tcs<<"ms; alpha="<<alpha<<"; t_slice="<<tslice<<"ms"<<endl;
 
     // make all the processese
     vector<Process> processes;
@@ -243,11 +282,7 @@ int main(int argc, char* argv[]) {
 
     //print all the processes stuffs
     for(size_t i = 0; i<processes.size(); i++){
-        if(i != processes.size() - 1){
-            printProcess(processes[i]); 
-        }else{
-            printProcess2(processes[i]);
-        }
+        printProcess(processes[i]);
     }
 
     /// NEW PART 2 CODE
@@ -259,6 +294,8 @@ int main(int argc, char* argv[]) {
     for (int i = 0; i < simulator::Count; i++) {
         sim.runSim(static_cast<simulator::ALGORITHM>(i));
     }
+
+    writeSimout(processes, cpuBoundCount);
 
     return 0;
 }
