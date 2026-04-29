@@ -1016,6 +1016,15 @@ class Simulator {
                     }
                 }
 
+                for (std::size_t i = 0; i < preemptedReadyReturns.size(); ) {
+                    if (preemptedReadyReturns[i].first == timeMS) {
+                        addReadyProcess(preemptedReadyReturns[i].second, timeMS, readyQueue, runtime);
+                        preemptedReadyReturns.erase(preemptedReadyReturns.begin() + i);
+                    } else {
+                        i++;
+                    }
+                }
+
                 if (currentProcess != -1) {
                     RuntimeProcess& running = runtime[currentProcess];
                     int elapsed = timeMS - cpuStartTime;
@@ -1086,15 +1095,6 @@ class Simulator {
                     addReadyProcess(processIndex, timeMS, readyQueue, runtime);
                     if (timeMS < eventPrintCutoff) {
                         std::cout<<"time "<<timeMS<<"ms: Process "<<runtime[processIndex].process.getId()<<" arrived; added to ready queue "<<formatQueue(readyQueue, runtime)<<std::endl;
-                    }
-                }
-
-                for (std::size_t i = 0; i < preemptedReadyReturns.size(); ) {
-                    if (preemptedReadyReturns[i].first == timeMS) {
-                        addReadyProcess(preemptedReadyReturns[i].second, timeMS, readyQueue, runtime);
-                        preemptedReadyReturns.erase(preemptedReadyReturns.begin() + i);
-                    } else {
-                        i++;
                     }
                 }
 
