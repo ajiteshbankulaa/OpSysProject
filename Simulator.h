@@ -56,6 +56,8 @@ class Simulator {
                 case simulator::SJF: runFCFS(true); break;
                 default: break;
             }
+
+            cout<<endl;
         }
 
         simulator::AlgorithmStats getRRStats() const {

@@ -311,7 +311,7 @@ int main(int argc, char* argv[]) {
     } else {
         cout<<defaultfloat<<alpha;
     }
-    cout<<"; t_slice="<<tslice<<"ms"<<endl;
+    cout<<"; t_slice="<<tslice<<"ms"<<endl<<endl;
 
     // make all the processese
     vector<Process> processes;
@@ -335,8 +335,9 @@ int main(int argc, char* argv[]) {
     for(size_t i = 0; i<processes.size(); i++){
         printProcess(processes[i]);
     }
+    cout<<endl;
     
-    cout<<"<<< PROJECT SIMULATIONS"<<endl;
+    cout<<"<<< PROJECT SIMULATIONS"<<endl<<endl;
 
     Simulator sim(processes, tcs, tslice, alpha, lambda);
     sim.runSim(simulator::FCFS);
