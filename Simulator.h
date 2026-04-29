@@ -173,7 +173,6 @@ class Simulator {
             readyQueue.insert(it, processIndex);
         }
 
-
         void runFCFS() {
             std::vector<RuntimeProcess> runtime;
             for (const Process& p : processes) {
@@ -189,48 +188,32 @@ class Simulator {
             int nextProcess = -1;
             int cpuStartTime = -1;
             int contextSwitchCompleteTime = -1;
-            int cpuBusyTime = 0;
-            int lastEventTime = 0;
             int lastRunningProcess = -1;
-
-            long long cpuBoundWaitTotal = 0, ioBoundWaitTotal = 0;
-            long long cpuBoundTurnaroundTotal = 0, ioBoundTurnaroundTotal = 0;
-            int cpuBoundBurstCount = 0, ioBoundBurstCount = 0;
 
             std::string algoName = "FCFS";
 
             std::cout << "time 0ms: Simulator started for " << algoName
                     << " " << formatQueueVec(readyQueue, runtime) << std::endl;
 
-            do {
+            while (true) {
+
+                // CPU burst completion
                 if (currentProcess != -1) {
                     RuntimeProcess& running = runtime[currentProcess];
                     int elapsed = timeMS - cpuStartTime;
 
                     if (running.remainingCpuTime == elapsed) {
-                        const std::vector<int>& cpuBursts = running.process.getCpuBursts();
-                        const std::vector<int>& ioBursts   = running.process.getIoBursts();
-                        // int actualBurst    = cpuBursts[running.cpuBurstIndex];
-                        int turnaroundTime = timeMS + tcs / 2 - running.currentBurstReadyTime;
+                        const auto& cpuBursts = running.process.getCpuBursts();
+                        const auto& ioBursts  = running.process.getIoBursts();
 
-                        cpuBusyTime += elapsed;
-                        running.remainingCpuTime  = 0;
-                        running.remainingPredicted = 0;
+                        running.remainingCpuTime = 0;
 
-                        if (running.process.isIoBound()) {
-                            ioBoundBurstCount++;
-                            ioBoundTurnaroundTotal += turnaroundTime;
-                        } else {
-                            cpuBoundBurstCount++;
-                            cpuBoundTurnaroundTotal += turnaroundTime;
-                        }
-
-                        int burstsLeft = static_cast<int>(cpuBursts.size()) - running.cpuBurstIndex - 1;
+                        int burstsLeft = cpuBursts.size() - running.cpuBurstIndex - 1;
 
                         if (burstsLeft == 0) {
                             running.terminated = true;
                             terminatedCount++;
-                            lastEventTime = timeMS + tcs / 2;
+
                             std::cout << "time " << timeMS << "ms: Process "
                                     << running.process.getId() << " terminated "
                                     << formatQueueVec(readyQueue, runtime) << std::endl;
@@ -241,6 +224,7 @@ class Simulator {
                                     << " to go " << formatQueueVec(readyQueue, runtime) << std::endl;
 
                             int ioCompletionTime = timeMS + ioBursts[running.cpuBurstIndex] + tcs / 2;
+
                             std::cout << "time " << timeMS << "ms: Process "
                                     << running.process.getId()
                                     << " switching out of CPU; blocking on I/O until time "
@@ -248,7 +232,6 @@ class Simulator {
                                     << formatQueueVec(readyQueue, runtime) << std::endl;
 
                             ioCompletions.push_back({ioCompletionTime, currentProcess});
-                            std::sort(ioCompletions.begin(), ioCompletions.end());
                             running.cpuBurstIndex++;
                         }
 
@@ -258,148 +241,76 @@ class Simulator {
                     }
                 }
 
-                //process starts
                 if (nextProcess != -1 && contextSwitchCompleteTime == timeMS) {
                     currentProcess = nextProcess;
                     nextProcess = -1;
                     cpuStartTime = timeMS;
+
                     RuntimeProcess& running = runtime[currentProcess];
-                    const std::vector<int>& cpuBursts = running.process.getCpuBursts();
-                    int fullBurst = cpuBursts[running.cpuBurstIndex];
+                    const auto& cpuBursts = running.process.getCpuBursts();
 
                     if (running.remainingCpuTime == 0) {
-                        running.remainingCpuTime = fullBurst;
+                        running.remainingCpuTime = cpuBursts[running.cpuBurstIndex];
                     }
 
-                    int waitTime = timeMS - running.readyQueueEnterTime;
-                    if (running.process.isIoBound()) ioBoundWaitTotal += waitTime;
-                    else cpuBoundWaitTotal += waitTime;
-
-
-                    std::cout << "time " << timeMS << "ms: Process " << running.process.getId()
-                                << " started using the CPU for " << fullBurst << "ms burst "
-                                << formatQueueVec(readyQueue, runtime) << std::endl;
-                    
+                    std::cout << "time " << timeMS << "ms: Process "
+                            << running.process.getId()
+                            << " started using the CPU for "
+                            << running.remainingCpuTime << "ms burst "
+                            << formatQueueVec(readyQueue, runtime) << std::endl;
                 }
 
-                //I/O
-                {
-                    std::vector<int> completingNow;
-                    for (std::size_t i = 0; i < ioCompletions.size(); ) {
-                        if (ioCompletions[i].first == timeMS) {
-                            completingNow.push_back(ioCompletions[i].second);
-                            ioCompletions.erase(ioCompletions.begin() + i);
-                        } else {
-                            i++;
-                        }
-                    }
+                for (size_t i = 0; i < ioCompletions.size();) {
+                    if (ioCompletions[i].first == timeMS) {
+                        int idx = ioCompletions[i].second;
+                        ioCompletions.erase(ioCompletions.begin() + i);
 
-                    //tie break
-                    std::sort(completingNow.begin(), completingNow.end(), [&](int a, int b) {
-                        return runtime[a].process.getId() < runtime[b].process.getId();
-                    });
+                        readyQueue.push_back(idx);
+                        runtime[idx].readyQueueEnterTime = timeMS;
 
-                    for (int idx : completingNow) {
-                        RuntimeProcess& rp = runtime[idx];
-                        const std::vector<int>& cpuBursts = rp.process.getCpuBursts();
-
-
-
-                        //check preemption
-                        if (currentProcess != -1 && nextProcess == -1) {
-                            RuntimeProcess& running = runtime[currentProcess];
-                            int elapsed = timeMS - cpuStartTime;
-
-                            if (rp.process.getId() < running.process.getId()) {
-
-                                cpuBusyTime += elapsed;
-                                running.remainingCpuTime  -= elapsed;
-
-                                if (running.process.isIoBound()) srtStats.ioBoundPreemptions++;
-                                else srtStats.cpuBoundPreemptions++;
-
-                                srtEnqueue(currentProcess, timeMS, readyQueue, runtime);
-                                lastRunningProcess = currentProcess;
-                                currentProcess = -1;
-                                cpuStartTime = -1;
-
-                                
-                                rp.readyQueueEnterTime   = timeMS;
-                                rp.currentBurstReadyTime = timeMS;
-                                nextProcess = idx;
-                                contextSwitchCompleteTime = timeMS + tcs;
-                            }
-                        }
-
-                        std::cout << "time " << timeMS << "ms: Process " << rp.process.getId()
+                        std::cout << "time " << timeMS << "ms: Process "
+                                << runtime[idx].process.getId()
                                 << " completed I/O; added to ready queue "
                                 << formatQueueVec(readyQueue, runtime) << std::endl;
-                        
+                    } else {
+                        i++;
                     }
                 }
 
-                //new process arrival
-                for (std::size_t i = 0; i < runtime.size(); i++) {
-                    if (!runtime[i].arrived && runtime[i].process.getArrivalTime() == timeMS) {
+                for (size_t i = 0; i < runtime.size(); i++) {
+                    if (!runtime[i].arrived &&
+                        runtime[i].process.getArrivalTime() == timeMS) {
+
                         runtime[i].arrived = true;
+                        readyQueue.push_back(i);
+                        runtime[i].readyQueueEnterTime = timeMS;
 
-                        const std::vector<int>& cpuBursts = runtime[i].process.getCpuBursts();
-
-                        bool didPreempt = false;
-
-                        if (currentProcess != -1 && nextProcess == -1) {
-                            RuntimeProcess& running = runtime[currentProcess];
-                            int elapsed = timeMS - cpuStartTime;
-
-                            if (runtime[i].process.getId() < running.process.getId()) {
-
-                                cpuBusyTime += elapsed;
-                                running.remainingCpuTime  -= elapsed;
-
-                                if (running.process.isIoBound()) srtStats.ioBoundPreemptions++;
-                                else srtStats.cpuBoundPreemptions++;
-
-                                //print
-                                srtEnqueue(currentProcess, timeMS, readyQueue, runtime);
-                                lastRunningProcess = currentProcess;
-                                currentProcess = -1;
-                                cpuStartTime = -1;
-
-                                runtime[i].readyQueueEnterTime   = timeMS;
-                                runtime[i].currentBurstReadyTime = timeMS;
-                                nextProcess = static_cast<int>(i);
-                                contextSwitchCompleteTime = timeMS + tcs;
-
-                                didPreempt = true;
-                            }
-                        }
-
-                        if (!didPreempt) {
-                            srtEnqueue(static_cast<int>(i), timeMS, readyQueue, runtime);
-                            std::cout << "time " << timeMS << "ms: Process "
-                                    << runtime[i].process.getId()
-                                    << " arrived; added to ready queue "
-                                    << formatQueueVec(readyQueue, runtime) << std::endl;
-                        }
+                        std::cout << "time " << timeMS << "ms: Process "
+                                << runtime[i].process.getId()
+                                << " arrived; added to ready queue "
+                                << formatQueueVec(readyQueue, runtime) << std::endl;
                     }
                 }
 
-                //start next context switch if CPU free and queue not empty
-                if (nextProcess == -1 && currentProcess == -1 && !readyQueue.empty()) {
+                if (currentProcess == -1 && nextProcess == -1 && !readyQueue.empty()) {
                     nextProcess = readyQueue.front();
                     readyQueue.erase(readyQueue.begin());
-                    contextSwitchCompleteTime = timeMS + (lastRunningProcess == -1 ? tcs / 2 : tcs);
+
+                    contextSwitchCompleteTime =
+                        timeMS + (lastRunningProcess == -1 ? tcs / 2 : tcs);
                 }
 
-                if (terminatedCount == static_cast<int>(runtime.size())) break;
+                // --- End condition ---
+                if (terminatedCount == runtime.size()) break;
 
-            } while (1 | timeMS++);
+                timeMS++;
+            }
 
-            lastEventTime = std::max(lastEventTime, timeMS + tcs / 2);
-            std::cout << "time " << lastEventTime << "ms: Simulator ended for " << algoName
+            std::cout << "time " << timeMS + tcs / 2
+                    << "ms: Simulator ended for " << algoName
                     << " " << formatQueueVec(readyQueue, runtime) << std::endl;
         }
-
+        
         void runSRT() {
             std::vector<RuntimeProcess> runtime;
             for (const Process& p : processes) {
