@@ -55,6 +55,11 @@ class Process {
         void addIoBurst(int t) {
             ioBursts.push_back(t);
         }
+
+        bool operator<(const Process& other) const {
+            return arrivalTime < other.arrivalTime;
+        }
+
 };
 
 #endif

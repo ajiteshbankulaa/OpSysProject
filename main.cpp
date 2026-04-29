@@ -249,6 +249,10 @@ int main(int argc, char* argv[]) {
             printProcess2(processes[i]);
         }
     }
+
+    /// NEW PART 2 CODE
+
+    std::sort(processes.begin(), processes.end());
     
     Simulator sim(&processes);
 

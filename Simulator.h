@@ -23,14 +23,15 @@ class Simulator {
                 case simulator::SJF: runSJF(); break;
                 case simulator::SRT: runSRT(); break;
                 case simulator::RR: runRR(); break;
+                default: break;
             };
         }
         
     private:
         std::vector<Process> processes;
-        void runFCFS();
-        void runSJF();
-        void runSRT();
-        void runRR();
+        void runFCFS() {};
+        void runSJF() {};
+        void runSRT() {};
+        void runRR() {};
 
 };  
