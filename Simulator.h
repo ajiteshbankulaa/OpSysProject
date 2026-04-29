@@ -159,6 +159,36 @@ class Simulator {
 
 
 
+        bool srtComesBefore(
+            int candidateIndex,
+            int selectedIndex,
+            const std::vector<RuntimeProcess>& runtime
+        ) const {
+            int candidatePredicted = runtime[candidateIndex].remainingPredicted;
+            int selectedPredicted = runtime[selectedIndex].remainingPredicted;
+            if (candidatePredicted != selectedPredicted) {
+                return candidatePredicted < selectedPredicted;
+            }
+
+            return runtime[candidateIndex].process.getId() < runtime[selectedIndex].process.getId();
+        }
+
+        void srtInsertReady(
+            int processIndex,
+            std::vector<int>& readyQueue,
+            const std::vector<RuntimeProcess>& runtime
+        ) {
+            auto it = readyQueue.begin();
+            while (it != readyQueue.end()) {
+                if (srtComesBefore(processIndex, *it, runtime)) {
+                    break;
+                }
+                ++it;
+            }
+
+            readyQueue.insert(it, processIndex);
+        }
+
         void srtEnqueue(
             int processIndex,
             int timeMS,
@@ -172,18 +202,7 @@ class Simulator {
                 runtime[processIndex].currentBurstReadyTime = timeMS;
             }
 
-            //find correct sorted position
-            auto it = readyQueue.begin();
-            while (it != readyQueue.end()) {
-                int existingPred = runtime[*it].remainingPredicted;
-                int newPred = runtime[processIndex].remainingPredicted;
-                if (newPred < existingPred) break;
-                if (newPred == existingPred &&
-                    runtime[processIndex].process.getId() < runtime[*it].process.getId()) break;
-                ++it;
-            }
-
-            readyQueue.insert(it, processIndex);
+            srtInsertReady(processIndex, readyQueue, runtime);
         }
 
         void sjfEnqueue(
@@ -554,9 +573,13 @@ class Simulator {
                         } else {
                             if (timeMS < eventPrintCutoff) {
                                 std::cout << "time " << timeMS << "ms: Process "
-                                        << running.process.getId() << " completed a CPU burst; "
-                                        << burstsLeft << (burstsLeft == 1 ? " burst" : " bursts")
-                                        << " to go " << formatQueueVec(readyQueue, runtime) << std::endl;
+                                        << running.process.getId();
+                                if (!isOpt) {
+                                    std::cout << " (tau " << running.tau << "ms)";
+                                }
+                                std::cout << " completed a CPU burst; "
+                                          << burstsLeft << (burstsLeft == 1 ? " burst" : " bursts")
+                                          << " to go " << formatQueueVec(readyQueue, runtime) << std::endl;
                             }
 
                             //recalculate tau
@@ -668,8 +691,26 @@ class Simulator {
 
                         bool didPreempt = false;
 
+                        if (currentProcess == -1 && nextProcess != -1 &&
+                            srtComesBefore(idx, nextProcess, runtime)) {
+                            srtInsertReady(nextProcess, readyQueue, runtime);
+                            rp.readyQueueEnterTime = timeMS;
+                            rp.currentBurstReadyTime = timeMS;
+                            nextProcess = idx;
+                            didPreempt = true;
+
+                            if (timeMS < eventPrintCutoff && !isOpt)
+                                std::cout << "time " << timeMS << "ms: Process " << rp.process.getId()
+                                        << " (tau " << rp.tau << "ms) completed I/O; added to ready queue "
+                                        << formatQueueVec(readyQueue, runtime) << std::endl;
+                            else if (timeMS < eventPrintCutoff)
+                                std::cout << "time " << timeMS << "ms: Process " << rp.process.getId()
+                                        << " completed I/O; added to ready queue "
+                                        << formatQueueVec(readyQueue, runtime) << std::endl;
+                        }
+
                         //check preemption
-                        if (currentProcess != -1 && nextProcess == -1) {
+                        if (!didPreempt && currentProcess != -1 && nextProcess == -1) {
                             RuntimeProcess& running = runtime[currentProcess];
                             int elapsed = timeMS - cpuStartTime;
                             int runRemPred = running.remainingPredicted - elapsed;
@@ -743,7 +784,27 @@ class Simulator {
 
                         bool didPreempt = false;
 
-                        if (currentProcess != -1 && nextProcess == -1) {
+                        if (currentProcess == -1 && nextProcess != -1 &&
+                            srtComesBefore(static_cast<int>(i), nextProcess, runtime)) {
+                            srtInsertReady(nextProcess, readyQueue, runtime);
+                            runtime[i].readyQueueEnterTime = timeMS;
+                            runtime[i].currentBurstReadyTime = timeMS;
+                            nextProcess = static_cast<int>(i);
+                            didPreempt = true;
+
+                            if (timeMS < eventPrintCutoff && !isOpt)
+                                std::cout << "time " << timeMS << "ms: Process "
+                                        << runtime[i].process.getId()
+                                        << " (tau " << runtime[i].tau << "ms) arrived; added to ready queue "
+                                        << formatQueueVec(readyQueue, runtime) << std::endl;
+                            else if (timeMS < eventPrintCutoff)
+                                std::cout << "time " << timeMS << "ms: Process "
+                                        << runtime[i].process.getId()
+                                        << " arrived; added to ready queue "
+                                        << formatQueueVec(readyQueue, runtime) << std::endl;
+                        }
+
+                        if (!didPreempt && currentProcess != -1 && nextProcess == -1) {
                             RuntimeProcess& running = runtime[currentProcess];
                             int elapsed = timeMS - cpuStartTime;
                             int runRemPred = running.remainingPredicted - elapsed;

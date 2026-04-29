@@ -180,7 +180,6 @@ void writeSimout(const vector<Process>& processes, int cpuBoundCount,
     writeAlgorithmStats(simout, alpha == -1.0 ? "SRT-OPT" : "SRT", srtStats);
     simout<<endl;
     writeAlgorithmStats(simout, "RR", rrStats);
-    simout<<endl;
 }
 
 //generate one  process
