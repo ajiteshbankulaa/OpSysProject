@@ -182,8 +182,8 @@ class Simulator {
             std::vector<int> readyQueue;
             std::vector<std::pair<int,int>> ioCompletions;
 
-            int timeMS = 0;
-            int terminatedCount = 0;
+            long long int timeMS = 0;
+            unsigned int terminatedCount = 0;
             int currentProcess = -1;
             int nextProcess = -1;
             int cpuStartTime = -1;
@@ -195,7 +195,7 @@ class Simulator {
             std::cout << "time 0ms: Simulator started for " << algoName
                     << " " << formatQueueVec(readyQueue, runtime) << std::endl;
 
-            while (true) {
+            do {
 
                 // CPU burst completion
                 if (currentProcess != -1) {
@@ -300,17 +300,15 @@ class Simulator {
                         timeMS + (lastRunningProcess == -1 ? tcs / 2 : tcs);
                 }
 
-                // --- End condition ---
                 if (terminatedCount == runtime.size()) break;
 
-                timeMS++;
-            }
+            } while(++timeMS);
 
             std::cout << "time " << timeMS + tcs / 2
                     << "ms: Simulator ended for " << algoName
                     << " " << formatQueueVec(readyQueue, runtime) << std::endl;
         }
-        
+
         void runSRT() {
             std::vector<RuntimeProcess> runtime;
             for (const Process& p : processes) {
@@ -619,7 +617,7 @@ class Simulator {
 
                 if (terminatedCount == static_cast<int>(runtime.size())) break;
 
-            } while (1 | timeMS++);
+            } while (++timeMS);
 
             lastEventTime = std::max(lastEventTime, timeMS + tcs / 2);
             srtStats.cpuBoundContextSwitches = cpuBoundBurstCount + srtStats.cpuBoundPreemptions;
@@ -799,7 +797,7 @@ class Simulator {
                 if (terminatedCount == static_cast<int>(runtime.size())) {
                     break;
                 }
-            } while(1 | timeMS++);
+            } while(++timeMS);
 
             lastEventTime = std::max(lastEventTime, timeMS + tcs / 2);
             rrStats.cpuBoundContextSwitches = cpuBoundBurstCount + rrStats.cpuBoundPreemptions;
