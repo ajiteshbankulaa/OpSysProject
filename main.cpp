@@ -170,9 +170,13 @@ void writeSimout(const vector<Process>& processes, int cpuBoundCount,
     simout<<"-- overall average I/O burst time: "<<computeAverage(overallIoTotal, overallIoCount)<<" ms"<<endl;
     
     writeAlgorithmStats(simout, "FCFS", fcfsStats);
+    simout<<endl;
     writeAlgorithmStats(simout, "SJF", sjfStats);
+    simout<<endl;
     writeAlgorithmStats(simout, "SRT", srtStats);
+    simout<<endl;
     writeAlgorithmStats(simout, "RR", rrStats);
+    simout<<endl;
 }
 
 //generate one  process
@@ -303,9 +307,9 @@ int main(int argc, char* argv[]) {
     srand48(seed);
 
     //print the top summary lines
-    cout<<"<<<-- process set (n="<<n<<") with "<<cpuBoundCount<<" CPU-bound "<<(cpuBoundCount == 1 ? "process" : "processes")<<endl;
-    cout<<"<<<-- seed="<<seed<<"; lambda="<<fixed<<setprecision(6)<<lambda<<"; upper bound="<<upperBound<<endl;
-    cout<<"<<<-- t_cs="<<tcs<<"ms; alpha=";
+    cout<<"<<< -- process set (n="<<n<<") with "<<cpuBoundCount<<" CPU-bound "<<(cpuBoundCount == 1 ? "process" : "processes")<<endl;
+    cout<<"<<< -- seed="<<seed<<"; lambda="<<fixed<<setprecision(6)<<lambda<<"; upper bound="<<upperBound<<endl;
+    cout<<"<<< -- t_cs="<<tcs<<"ms; alpha=";
     if (alpha == -1.0) {
         cout<<"<n/a>";
     } else {
