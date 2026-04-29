@@ -191,6 +191,12 @@ class Simulator {
             for (const Process& p : processes) {
                 runtime.push_back(RuntimeProcess(p));
             }
+            if (is_sjf && alpha != -1.0) {
+                int initTau = static_cast<int>(ceil(1.0 / lambda));
+                for (RuntimeProcess& process : runtime) {
+                    process.tau = initTau;
+                }
+            }
 
             std::vector<int> readyQueue;
             std::vector<std::pair<int,int>> ioCompletions;
@@ -272,6 +278,9 @@ class Simulator {
                                     << ioCompletionTime << "ms "
                                     << formatQueueVec(readyQueue, runtime) << std::endl;
 
+                            if (is_sjf && alpha != -1.0) {
+                                running.tau = static_cast<int>(ceil(alpha * cpuBursts[running.cpuBurstIndex] + (1.0 - alpha) * running.tau));
+                            }
                             ioCompletions.push_back({ioCompletionTime, currentProcess});
                             running.cpuBurstIndex++;
                         }
@@ -345,8 +354,8 @@ class Simulator {
                     if (is_sjf) {
                         std::sort(readyQueue.begin(), readyQueue.end(),
                         [runtime](int a, int b) {
-                            int aBurst = runtime[a].process.getCpuBursts()[runtime[a].cpuBurstIndex];
-                            int bBurst = runtime[b].process.getCpuBursts()[runtime[b].cpuBurstIndex];
+                            int aBurst = runtime[a].tau == 0 ? runtime[a].process.getCpuBursts()[runtime[a].cpuBurstIndex] : runtime[a].tau;
+                            int bBurst = runtime[b].tau == 0 ? runtime[b].process.getCpuBursts()[runtime[b].cpuBurstIndex] : runtime[b].tau;
                             if (aBurst != bBurst) {
                                 return aBurst < bBurst;
                             }
@@ -420,6 +429,7 @@ class Simulator {
 
             std::vector<int> readyQueue;
             std::vector<std::pair<int,int>> ioCompletions;
+            std::vector<std::pair<int,int>> preemptedReadyReturns;
 
             int timeMS = 0;
             int terminatedCount = 0;
@@ -429,7 +439,7 @@ class Simulator {
             int contextSwitchCompleteTime = -1;
             int cpuBusyTime = 0;
             int lastEventTime = 0;
-            int lastRunningProcess = -1;
+            int switchOutCompleteTime = 0;
 
             long long cpuBoundWaitTotal = 0, ioBoundWaitTotal = 0;
             long long cpuBoundTurnaroundTotal = 0, ioBoundTurnaroundTotal = 0;
@@ -503,7 +513,7 @@ class Simulator {
                             running.cpuBurstIndex++;
                         }
 
-                        lastRunningProcess = currentProcess;
+                        switchOutCompleteTime = timeMS + tcs / 2;
                         currentProcess = -1;
                         cpuStartTime = -1;
                     }
@@ -549,6 +559,15 @@ class Simulator {
                                     << " started using the CPU for remaining "
                                     << running.remainingCpuTime << "ms of " << fullBurst << "ms burst "
                                     << formatQueueVec(readyQueue, runtime) << std::endl;
+                    }
+                }
+
+                for (std::size_t i = 0; i < preemptedReadyReturns.size(); ) {
+                    if (preemptedReadyReturns[i].first == timeMS) {
+                        srtEnqueue(preemptedReadyReturns[i].second, timeMS, readyQueue, runtime);
+                        preemptedReadyReturns.erase(preemptedReadyReturns.begin() + i);
+                    } else {
+                        i++;
                     }
                 }
 
@@ -613,8 +632,9 @@ class Simulator {
                                             << " (remaining time " << running.remainingCpuTime << "ms) "
                                             << formatQueueVec(readyQueue, runtime) << std::endl;
 
-                                srtEnqueue(currentProcess, timeMS, readyQueue, runtime);
-                                lastRunningProcess = currentProcess;
+                                preemptedReadyReturns.push_back({timeMS + tcs / 2, currentProcess});
+                                std::sort(preemptedReadyReturns.begin(), preemptedReadyReturns.end());
+                                switchOutCompleteTime = timeMS + tcs / 2;
                                 currentProcess = -1;
                                 cpuStartTime = -1;
 
@@ -688,8 +708,9 @@ class Simulator {
                                             << " (remaining time " << running.remainingCpuTime << "ms) "
                                             << formatQueueVec(readyQueue, runtime) << std::endl;
 
-                                srtEnqueue(currentProcess, timeMS, readyQueue, runtime);
-                                lastRunningProcess = currentProcess;
+                                preemptedReadyReturns.push_back({timeMS + tcs / 2, currentProcess});
+                                std::sort(preemptedReadyReturns.begin(), preemptedReadyReturns.end());
+                                switchOutCompleteTime = timeMS + tcs / 2;
                                 currentProcess = -1;
                                 cpuStartTime = -1;
 
@@ -722,7 +743,7 @@ class Simulator {
                 if (nextProcess == -1 && currentProcess == -1 && !readyQueue.empty()) {
                     nextProcess = readyQueue.front();
                     readyQueue.erase(readyQueue.begin());
-                    contextSwitchCompleteTime = timeMS + (lastRunningProcess == -1 ? tcs / 2 : tcs);
+                    contextSwitchCompleteTime = std::max(timeMS, switchOutCompleteTime) + tcs / 2;
                 }
 
                 if (terminatedCount == static_cast<int>(runtime.size())) break;
@@ -757,6 +778,7 @@ class Simulator {
 
             std::queue<int> readyQueue;
             std::vector<std::pair<int, int> > ioCompletions;
+            std::vector<std::pair<int, int> > preemptedReadyReturns;
 
             int timeMS = 0;
             int terminatedCount = 0;
@@ -861,6 +883,50 @@ class Simulator {
                     }
                 }
 
+                for (std::size_t i = 0; i < preemptedReadyReturns.size(); ) {
+                    if (preemptedReadyReturns[i].first == timeMS) {
+                        addReadyProcess(preemptedReadyReturns[i].second, timeMS, readyQueue, runtime);
+                        preemptedReadyReturns.erase(preemptedReadyReturns.begin() + i);
+                    } else {
+                        i++;
+                    }
+                }
+
+                if (currentProcess != -1) {
+                    RuntimeProcess& running = runtime[currentProcess];
+                    int elapsed = timeMS - cpuStartTime;
+
+                    if (elapsed > 0 && elapsed % tslice == 0) {
+                        running.remainingCpuTime -= tslice;
+                        cpuBusyTime += tslice;
+                        if (running.process.isIoBound()) {
+                            ioBoundCpuBusyTime += tslice;
+                        } else {
+                            cpuBoundCpuBusyTime += tslice;
+                        }
+
+                        if (readyQueue.empty()) {
+                            if (timeMS < eventPrintCutoff) {
+                                std::cout<<"time "<<timeMS<<"ms: Time slice expired; no preemption because ready queue is empty "<<formatQueue(readyQueue, runtime)<<std::endl;
+                            }
+                            cpuStartTime = timeMS;
+                        } else {
+                            if (running.process.isIoBound()) {
+                                rrStats.ioBoundPreemptions++;
+                            } else {
+                                rrStats.cpuBoundPreemptions++;
+                            }
+
+                            std::cout<<"time "<<timeMS<<"ms: Time slice expired; preempting process "<<running.process.getId()<<" with "<<running.remainingCpuTime<<"ms remaining "<<formatQueue(readyQueue, runtime)<<std::endl;
+                            preemptedReadyReturns.push_back(std::make_pair(timeMS + tcs / 2, currentProcess));
+                            std::sort(preemptedReadyReturns.begin(), preemptedReadyReturns.end());
+                            switchOutCompleteTime = timeMS + tcs / 2;
+                            currentProcess = -1;
+                            cpuStartTime = -1;
+                        }
+                    }
+                }
+
                 std::vector<int> completedIoThisTime;
                 for (std::size_t i = 0; i < ioCompletions.size(); ) {
                     if (ioCompletions[i].first == timeMS) {
@@ -896,40 +962,6 @@ class Simulator {
                     addReadyProcess(processIndex, timeMS, readyQueue, runtime);
                     if (timeMS < eventPrintCutoff) {
                         std::cout<<"time "<<timeMS<<"ms: Process "<<runtime[processIndex].process.getId()<<" arrived; added to ready queue "<<formatQueue(readyQueue, runtime)<<std::endl;
-                    }
-                }
-
-                if (currentProcess != -1) {
-                    RuntimeProcess& running = runtime[currentProcess];
-                    int elapsed = timeMS - cpuStartTime;
-
-                    if (elapsed > 0 && elapsed % tslice == 0) {
-                        running.remainingCpuTime -= tslice;
-                        cpuBusyTime += tslice;
-                        if (running.process.isIoBound()) {
-                            ioBoundCpuBusyTime += tslice;
-                        } else {
-                            cpuBoundCpuBusyTime += tslice;
-                        }
-
-                        if (readyQueue.empty()) {
-                            if (timeMS < eventPrintCutoff) {
-                                std::cout<<"time "<<timeMS<<"ms: Time slice expired; no preemption because ready queue is empty "<<formatQueue(readyQueue, runtime)<<std::endl;
-                            }
-                            cpuStartTime = timeMS;
-                        } else {
-                            if (running.process.isIoBound()) {
-                                rrStats.ioBoundPreemptions++;
-                            } else {
-                                rrStats.cpuBoundPreemptions++;
-                            }
-
-                            std::cout<<"time "<<timeMS<<"ms: Time slice expired; preempting process "<<running.process.getId()<<" with "<<running.remainingCpuTime<<"ms remaining "<<formatQueue(readyQueue, runtime)<<std::endl;
-                            addReadyProcess(currentProcess, timeMS, readyQueue, runtime);
-                            switchOutCompleteTime = timeMS + tcs / 2;
-                            currentProcess = -1;
-                            cpuStartTime = -1;
-                        }
                     }
                 }
 
