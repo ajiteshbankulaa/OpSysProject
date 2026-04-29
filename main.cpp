@@ -5,7 +5,7 @@
 #include <cstdlib>
 #include <iomanip>
 #include <stdexcept>
-#include "Process.h"
+#include "Simulator.h"
 
 using namespace std;
 
@@ -248,6 +248,12 @@ int main(int argc, char* argv[]) {
         }else{
             printProcess2(processes[i]);
         }
+    }
+    
+    Simulator sim(&processes);
+
+    for (int i = 0; i < simulator::Count; i++) {
+        sim.runSim(static_cast<simulator::ALGORITHM>(i));
     }
 
     return 0;
