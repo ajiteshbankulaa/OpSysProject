@@ -67,6 +67,26 @@ double computeAverage(long long total, int count) {
     return static_cast<double>(total) / static_cast<double>(count);
 }
 
+int parseIntArg(const char* value) {
+    std::string text(value);
+    std::size_t parsed = 0;
+    int result = std::stoi(text, &parsed);
+    if (parsed != text.size()) {
+        throw std::invalid_argument("invalid integer");
+    }
+    return result;
+}
+
+double parseDoubleArg(const char* value) {
+    std::string text(value);
+    std::size_t parsed = 0;
+    double result = std::stod(text, &parsed);
+    if (parsed != text.size() || !std::isfinite(result)) {
+        throw std::invalid_argument("invalid double");
+    }
+    return result;
+}
+
 
 
 //the file shit
@@ -257,14 +277,14 @@ int main(int argc, char* argv[]) {
 
     // try to get vals from argv and make sure  valid OR ELSE EERORORRORRORROR
     try{
-        n = stoi(argv[1]);
-        cpuBoundCount = stoi(argv[2]);
-        seed = stoi(argv[3]);
-        lambda = stod(argv[4]);
-        upperBound = stoi(argv[5]);
-        tcs = stoi(argv[6]);
-        alpha = stod(argv[7]);
-        tslice = stoi(argv[8]);
+        n = parseIntArg(argv[1]);
+        cpuBoundCount = parseIntArg(argv[2]);
+        seed = parseIntArg(argv[3]);
+        lambda = parseDoubleArg(argv[4]);
+        upperBound = parseIntArg(argv[5]);
+        tcs = parseIntArg(argv[6]);
+        alpha = parseDoubleArg(argv[7]);
+        tslice = parseIntArg(argv[8]);
     }catch (const exception&){
         cerr<<"ERROR: invalid argument type"<<endl;
         return 1;
