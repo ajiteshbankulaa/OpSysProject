@@ -169,10 +169,10 @@ void writeSimout(const vector<Process>& processes, int cpuBoundCount, double cla
     simout<<"-- I/O-bound average I/O burst time: "<<computeAverage(ioBoundIoTotal, ioBoundIoCount)<<" ms"<<endl;
     simout<<"-- overall average I/O burst time: "<<computeAverage(overallIoTotal, overallIoCount)<<" ms"<<endl;
     
-    // writeAlgorithmStats(simout, "FCFS", fcfsStats);
+    writeAlgorithmStats(simout, "FCFS", fcfsStats);
     writeAlgorithmStats(simout, "SJF", sjfStats);
-    // writeAlgorithmStats(simout, "SRT", srtStats);
-    // writeAlgorithmStats(simout, "RR", rrStats);
+    writeAlgorithmStats(simout, "SRT", srtStats);
+    writeAlgorithmStats(simout, "RR", rrStats);
 }
 
 //generate one  process
