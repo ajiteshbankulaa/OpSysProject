@@ -24,15 +24,15 @@ class Process {
             arrivalTime = 0;
         }
 
-        string getId(){
+        string getId() const{
             return id;
         }
 
-        bool isIoBound(){
+        bool isIoBound() const{
             return ioBound;
         }
 
-        int getArrivalTime(){
+        int getArrivalTime() const{
             return arrivalTime;
         }
 
@@ -40,7 +40,15 @@ class Process {
             return cpuBursts;
         }
 
+        const vector<int>& getCpuBursts() const {
+            return cpuBursts;
+        }
+
         vector<int>& getIoBursts() {
+            return ioBursts;
+        }
+
+        const vector<int>& getIoBursts() const {
             return ioBursts;
         }
 

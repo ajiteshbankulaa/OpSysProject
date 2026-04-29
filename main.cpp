@@ -49,13 +49,13 @@ string makeProcessId(int index) {
 }
 
 // print one process in the summary format
-void printProcess(Process& p) {
-    vector<int>& cpu = p.getCpuBursts();
+void printProcess(const Process& p) {
+    const vector<int>& cpu = p.getCpuBursts();
 
     if (p.isIoBound()){
-        cout<<"I/O-bound process "<<p.getId()<<": arrival time "<<p.getArrivalTime()<<"ms; "<<cpu.size()<<" "<<(cpu.size() == 1 ? "CPU burst" : "CPU bursts")<<endl;
+        cout<<"I/O-bound process "<<p.getId()<<": arrival time "<<p.getArrivalTime()<<"ms; "<<cpu.size()<<" "<<(cpu.size() == 1 ? "CPU burst" : "CPU bursts")<<":"<<endl;
     }else{
-        cout<<"CPU-bound process "<<p.getId()<<": arrival time "<<p.getArrivalTime()<<"ms; "<<cpu.size()<<" "<<(cpu.size() == 1 ? "CPU burst" : "CPU bursts")<<endl;
+        cout<<"CPU-bound process "<<p.getId()<<": arrival time "<<p.getArrivalTime()<<"ms; "<<cpu.size()<<" "<<(cpu.size() == 1 ? "CPU burst" : "CPU bursts")<<":"<<endl;
     }
 }
 
@@ -70,7 +70,27 @@ double computeAverage(long long total, int count) {
 
 
 //the file shit
-void writeSimout(vector<Process>& processes, int cpuBoundCount) {
+void writeAlgorithmStats(ofstream& simout, const string& algorithm, const simulator::AlgorithmStats& stats) {
+    simout<<"Algorithm "<<algorithm<<endl;
+    simout<<"-- CPU utilization: "<<stats.cpuUtilization<<"%"<<endl;
+    simout<<"-- CPU-bound average wait time: "<<stats.cpuBoundAverageWait<<" ms"<<endl;
+    simout<<"-- I/O-bound average wait time: "<<stats.ioBoundAverageWait<<" ms"<<endl;
+    simout<<"-- overall average wait time: "<<stats.overallAverageWait<<" ms"<<endl;
+    simout<<"-- CPU-bound average turnaround time: "<<stats.cpuBoundAverageTurnaround<<" ms"<<endl;
+    simout<<"-- I/O-bound average turnaround time: "<<stats.ioBoundAverageTurnaround<<" ms"<<endl;
+    simout<<"-- overall average turnaround time: "<<stats.overallAverageTurnaround<<" ms"<<endl;
+    simout<<"-- CPU-bound number of context switches: "<<stats.cpuBoundContextSwitches<<endl;
+    simout<<"-- I/O-bound number of context switches: "<<stats.ioBoundContextSwitches<<endl;
+    simout<<"-- overall number of context switches: "<<stats.overallContextSwitches<<endl;
+    simout<<"-- CPU-bound number of preemptions: "<<stats.cpuBoundPreemptions<<endl;
+    simout<<"-- I/O-bound number of preemptions: "<<stats.ioBoundPreemptions<<endl;
+    simout<<"-- overall number of preemptions: "<<stats.overallPreemptions<<endl;
+    simout<<"-- CPU-bound percentage of CPU bursts completed within one time slice: "<<stats.cpuBoundOneSlicePercent<<"%"<<endl;
+    simout<<"-- I/O-bound percentage of CPU bursts completed within one time slice: "<<stats.ioBoundOneSlicePercent<<"%"<<endl;
+    simout<<"-- overall percentage of CPU bursts completed within one time slice: "<<stats.overallOneSlicePercent<<"%"<<endl;
+}
+
+void writeSimout(const vector<Process>& processes, int cpuBoundCount, const simulator::AlgorithmStats& rrStats) {
     //open fil
     ofstream simout("simout.txt");
 
@@ -84,9 +104,9 @@ void writeSimout(vector<Process>& processes, int cpuBoundCount) {
     int ioBoundIoCount = 0;
 
     // loop through all processes and add up the totals and counts for cpu and io bursts for both cpu-bound and io-bound processes
-    for (Process& process : processes) {
-        vector<int>& cpuBursts = process.getCpuBursts();
-        vector<int>& ioBursts = process.getIoBursts();
+    for (const Process& process : processes) {
+        const vector<int>& cpuBursts = process.getCpuBursts();
+        const vector<int>& ioBursts = process.getIoBursts();
 
         if (process.isIoBound()) {
             for (int burst : cpuBursts) {
@@ -128,6 +148,7 @@ void writeSimout(vector<Process>& processes, int cpuBoundCount) {
     simout<<"-- CPU-bound average I/O burst time: "<<computeAverage(cpuBoundIoTotal, cpuBoundIoCount)<<" ms"<<endl;
     simout<<"-- I/O-bound average I/O burst time: "<<computeAverage(ioBoundIoTotal, ioBoundIoCount)<<" ms"<<endl;
     simout<<"-- overall average I/O burst time: "<<computeAverage(overallIoTotal, overallIoCount)<<" ms"<<endl;
+    writeAlgorithmStats(simout, "RR", rrStats);
 }
 
 //generate one  process
@@ -260,7 +281,13 @@ int main(int argc, char* argv[]) {
     //print the top summary lines
     cout<<"<<<-- process set (n="<<n<<") with "<<cpuBoundCount<<" CPU-bound "<<(cpuBoundCount == 1 ? "process" : "processes")<<endl;
     cout<<"<<<-- seed="<<seed<<"; lambda="<<fixed<<setprecision(6)<<lambda<<"; upper bound="<<upperBound<<endl;
-    cout<<"<<<-- t_cs="<<tcs<<"ms; alpha="<<alpha<<"; t_slice="<<tslice<<"ms"<<endl;
+    cout<<"<<<-- t_cs="<<tcs<<"ms; alpha=";
+    if (alpha == -1.0) {
+        cout<<"<n/a>";
+    } else {
+        cout<<defaultfloat<<alpha;
+    }
+    cout<<"; t_slice="<<tslice<<"ms"<<endl;
 
     // make all the processese
     vector<Process> processes;
@@ -284,18 +311,13 @@ int main(int argc, char* argv[]) {
     for(size_t i = 0; i<processes.size(); i++){
         printProcess(processes[i]);
     }
-
-    /// NEW PART 2 CODE
-
-    std::sort(processes.begin(), processes.end());
     
-    Simulator sim(&processes);
+    cout<<"<<< PROJECT SIMULATIONS"<<endl;
 
-    for (int i = 0; i < simulator::Count; i++) {
-        sim.runSim(static_cast<simulator::ALGORITHM>(i));
-    }
+    Simulator sim(processes, tcs, tslice);
+    sim.runSim(simulator::RR);
 
-    writeSimout(processes, cpuBoundCount);
+    writeSimout(processes, cpuBoundCount, sim.getRRStats());
 
     return 0;
 }
