@@ -93,7 +93,7 @@ void writeAlgorithmStats(ofstream& simout, const string& algorithm, const simula
 
 
 
-void writeSimout(const vector<Process>& processes, int cpuBoundCount, double clalpha,
+void writeSimout(const vector<Process>& processes, int cpuBoundCount,
                 const simulator::AlgorithmStats& fcfsStats,
                 const simulator::AlgorithmStats& sjfStats,
                 const simulator::AlgorithmStats& srtStats,
@@ -344,7 +344,7 @@ int main(int argc, char* argv[]) {
     sim.runSim(simulator::SRT);
     sim.runSim(simulator::RR);
 
-    writeSimout(processes, cpuBoundCount, alpha, sim.getFCFSStats(), sim.getSJFStats(), sim.getSRTStats(), sim.getRRStats());
+    writeSimout(processes, cpuBoundCount, sim.getFCFSStats(), sim.getSJFStats(), sim.getSRTStats(), sim.getRRStats());
 
     return 0;
 }
