@@ -63,6 +63,10 @@ class Simulator {
         simulator::AlgorithmStats getSRTStats() const {
             return srtStats;
         }
+        simulator::AlgorithmStats getFCFSStats() const {
+            return fcfsStats;
+        }
+
         
     private:
         struct RuntimeProcess {
@@ -82,6 +86,7 @@ class Simulator {
         std::vector<Process> processes;
         int tcs = 0;
         int tslice = 0;
+        simulator::AlgorithmStats fcfsStats;
         simulator::AlgorithmStats rrStats;
         double alpha = 0.0;
         double lambda = 0.0;
@@ -182,7 +187,7 @@ class Simulator {
             std::vector<int> readyQueue;
             std::vector<std::pair<int,int>> ioCompletions;
 
-            long long int timeMS = 0;
+            long long timeMS = 0;
             unsigned int terminatedCount = 0;
             int currentProcess = -1;
             int nextProcess = -1;
@@ -190,14 +195,20 @@ class Simulator {
             int contextSwitchCompleteTime = -1;
             int lastRunningProcess = -1;
 
+            long long cpuBusyTime = 0;
+
+            long long cpuBoundWaitTotal = 0, ioBoundWaitTotal = 0;
+            long long cpuBoundTurnaroundTotal = 0, ioBoundTurnaroundTotal = 0;
+
+            int cpuBoundBurstCount = 0, ioBoundBurstCount = 0;
+            int cpuBoundOneSliceCount = 0, ioBoundOneSliceCount = 0;
+
             std::string algoName = "FCFS";
 
             std::cout << "time 0ms: Simulator started for " << algoName
                     << " " << formatQueueVec(readyQueue, runtime) << std::endl;
 
             do {
-
-                // CPU burst completion
                 if (currentProcess != -1) {
                     RuntimeProcess& running = runtime[currentProcess];
                     int elapsed = timeMS - cpuStartTime;
@@ -206,8 +217,24 @@ class Simulator {
                         const auto& cpuBursts = running.process.getCpuBursts();
                         const auto& ioBursts  = running.process.getIoBursts();
 
-                        running.remainingCpuTime = 0;
+                        // CPU utilization
+                        cpuBusyTime += elapsed;
 
+                        // Turnaround time
+                        long long turnaround =
+                            timeMS - running.readyQueueEnterTime;
+
+                        if (running.process.isIoBound()) {
+                            ioBoundTurnaroundTotal += turnaround;
+                            ioBoundBurstCount++;
+                            ioBoundOneSliceCount++;
+                        } else {
+                            cpuBoundTurnaroundTotal += turnaround;
+                            cpuBoundBurstCount++;
+                            cpuBoundOneSliceCount++;
+                        }
+
+                        running.remainingCpuTime = 0;
                         int burstsLeft = cpuBursts.size() - running.cpuBurstIndex - 1;
 
                         if (burstsLeft == 0) {
@@ -223,7 +250,8 @@ class Simulator {
                                     << burstsLeft << (burstsLeft == 1 ? " burst" : " bursts")
                                     << " to go " << formatQueueVec(readyQueue, runtime) << std::endl;
 
-                            int ioCompletionTime = timeMS + ioBursts[running.cpuBurstIndex] + tcs / 2;
+                            int ioCompletionTime =
+                                timeMS + ioBursts[running.cpuBurstIndex] + tcs / 2;
 
                             std::cout << "time " << timeMS << "ms: Process "
                                     << running.process.getId()
@@ -241,17 +269,33 @@ class Simulator {
                     }
                 }
 
+                // ======================
+                // Context switch completion
+                // ======================
                 if (nextProcess != -1 && contextSwitchCompleteTime == timeMS) {
                     currentProcess = nextProcess;
                     nextProcess = -1;
-                    cpuStartTime = timeMS;
 
                     RuntimeProcess& running = runtime[currentProcess];
                     const auto& cpuBursts = running.process.getCpuBursts();
 
                     if (running.remainingCpuTime == 0) {
-                        running.remainingCpuTime = cpuBursts[running.cpuBurstIndex];
+                        running.remainingCpuTime =
+                            cpuBursts[running.cpuBurstIndex];
                     }
+
+                    // Wait time
+                    long long wait =
+                        timeMS - running.readyQueueEnterTime;
+
+                    if (running.process.isIoBound()) {
+                        ioBoundWaitTotal += wait;
+                    } else {
+                        cpuBoundWaitTotal += wait;
+
+                    }
+
+                    cpuStartTime = timeMS;
 
                     std::cout << "time " << timeMS << "ms: Process "
                             << running.process.getId()
@@ -302,14 +346,47 @@ class Simulator {
 
                 if (terminatedCount == runtime.size()) break;
 
-            } while(++timeMS);
+            } while (++timeMS);
+
+            fcfsStats.overallPreemptions = 0;
+
+            fcfsStats.cpuBoundContextSwitches = cpuBoundBurstCount;
+            fcfsStats.ioBoundContextSwitches = ioBoundBurstCount;
+            fcfsStats.overallContextSwitches =
+                cpuBoundBurstCount + ioBoundBurstCount;
+
+            fcfsStats.cpuUtilization =
+                percent(cpuBusyTime, timeMS);
+
+            fcfsStats.cpuBoundAverageWait =
+                average(cpuBoundWaitTotal, cpuBoundBurstCount);
+            fcfsStats.ioBoundAverageWait =
+                average(ioBoundWaitTotal, ioBoundBurstCount);
+            fcfsStats.overallAverageWait =
+                average(cpuBoundWaitTotal + ioBoundWaitTotal,
+                        cpuBoundBurstCount + ioBoundBurstCount);
+
+            fcfsStats.cpuBoundAverageTurnaround =
+                average(cpuBoundTurnaroundTotal, cpuBoundBurstCount);
+            fcfsStats.ioBoundAverageTurnaround =
+                average(ioBoundTurnaroundTotal, ioBoundBurstCount);
+            fcfsStats.overallAverageTurnaround =
+                average(cpuBoundTurnaroundTotal + ioBoundTurnaroundTotal,
+                        cpuBoundBurstCount + ioBoundBurstCount);
+
+            fcfsStats.cpuBoundOneSlicePercent =
+                percent(cpuBoundOneSliceCount, cpuBoundBurstCount);
+            fcfsStats.ioBoundOneSlicePercent =
+                percent(ioBoundOneSliceCount, ioBoundBurstCount);
+            fcfsStats.overallOneSlicePercent =
+                percent(cpuBoundOneSliceCount + ioBoundOneSliceCount,
+                        cpuBoundBurstCount + ioBoundBurstCount);
 
             std::cout << "time " << timeMS + tcs / 2
                     << "ms: Simulator ended for " << algoName
                     << " " << formatQueueVec(readyQueue, runtime) << std::endl;
-        }
-
-        void runSRT() {
+        }  
+      void runSRT() {
             std::vector<RuntimeProcess> runtime;
             for (const Process& p : processes) {
                 runtime.push_back(RuntimeProcess(p));

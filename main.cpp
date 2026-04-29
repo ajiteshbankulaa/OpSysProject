@@ -91,29 +91,10 @@ void writeAlgorithmStats(ofstream& simout, const string& algorithm, const simula
 }
 
 
-void writeSRTStats(ofstream& simout, double alpha, const simulator::AlgorithmStats& stats) {
-    string algoName = (alpha == -1.0) ? "SRT-OPT" : "SRT";
-    simout<<"Algorithm "<<algoName<<endl;
-    simout<<"-- CPU utilization: "<<stats.cpuUtilization<<"%"<<endl;
-    simout<<"-- CPU-bound average wait time: "<<stats.cpuBoundAverageWait<<" ms"<<endl;
-    simout<<"-- I/O-bound average wait time: "<<stats.ioBoundAverageWait<<" ms"<<endl;
-    simout<<"-- overall average wait time: "<<stats.overallAverageWait<<" ms"<<endl;
-    simout<<"-- CPU-bound average turnaround time: "<<stats.cpuBoundAverageTurnaround<<" ms"<<endl;
-    simout<<"-- I/O-bound average turnaround time: "<<stats.ioBoundAverageTurnaround<<" ms"<<endl;
-    simout<<"-- overall average turnaround time: "<<stats.overallAverageTurnaround<<" ms"<<endl;
-    simout<<"-- CPU-bound number of context switches: "<<stats.cpuBoundContextSwitches<<endl;
-    simout<<"-- I/O-bound number of context switches: "<<stats.ioBoundContextSwitches<<endl;
-    simout<<"-- overall number of context switches: "<<stats.overallContextSwitches<<endl;
-    simout<<"-- CPU-bound number of preemptions: "<<stats.cpuBoundPreemptions<<endl;
-    simout<<"-- I/O-bound number of preemptions: "<<stats.ioBoundPreemptions<<endl;
-    simout<<"-- overall number of preemptions: "<<stats.overallPreemptions<<endl;
-}
-
-
-
 
 
 void writeSimout(const vector<Process>& processes, int cpuBoundCount, double alpha,
+                const simulator::AlgorithmStats& fcfsStats,
                  const simulator::AlgorithmStats& srtStats,
                  const simulator::AlgorithmStats& rrStats)
 {
@@ -187,7 +168,8 @@ void writeSimout(const vector<Process>& processes, int cpuBoundCount, double alp
     simout<<"-- I/O-bound average I/O burst time: "<<computeAverage(ioBoundIoTotal, ioBoundIoCount)<<" ms"<<endl;
     simout<<"-- overall average I/O burst time: "<<computeAverage(overallIoTotal, overallIoCount)<<" ms"<<endl;
     
-    writeSRTStats(simout, alpha, srtStats);
+    writeAlgorithmStats(simout, "FCFS", fcfsStats);
+    writeAlgorithmStats(simout, "SRT", srtStats);
     writeAlgorithmStats(simout, "RR", rrStats);
 }
 
@@ -355,11 +337,11 @@ int main(int argc, char* argv[]) {
     cout<<"<<< PROJECT SIMULATIONS"<<endl;
 
     Simulator sim(processes, tcs, tslice, alpha, lambda);
-    // sim.runSim(simulator::FCFS);
-    // sim.runSim(simulator::SRT);
-    // sim.runSim(simulator::RR);
+    sim.runSim(simulator::FCFS);
+    sim.runSim(simulator::SRT);
+    sim.runSim(simulator::RR);
 
-    // writeSimout(processes, cpuBoundCount, alpha, sim.getSRTStats(), sim.getRRStats());
+    writeSimout(processes, cpuBoundCount, alpha, sim.getFCFSStats(), sim.getSRTStats(), sim.getRRStats());
 
     return 0;
 }
