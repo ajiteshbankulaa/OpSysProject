@@ -160,6 +160,9 @@ int main(int argc, char* argv[]) {
     int seed;
     double lambda;
     int upperBound;
+    int tcs;
+    double alpha;
+    int tslice;
 
     // try to get vals from argv and make sure  valid OR ELSE EERORORRORRORROR
     try{
@@ -168,6 +171,9 @@ int main(int argc, char* argv[]) {
         seed = stoi(argv[3]);
         lambda = stod(argv[4]);
         upperBound = stoi(argv[5]);
+        tcs = stoi(argv[6]);
+        alpha = stod(argv[7]);
+        tslice = stoi(argv[8]);
     }catch (const exception&){
         cerr<<"ERROR: invalid argument type"<<endl;
         return 1;
@@ -191,6 +197,21 @@ int main(int argc, char* argv[]) {
 
     if(upperBound <= 0){
         cerr<<"ERROR: upper bound must be > 0"<<endl;
+        return 1;
+    }
+
+    if(tcs <= 0 || tcs % 2 != 0){
+        cerr<<"ERROR: tcs must be a positive even integer"<<endl;
+        return 1;
+    }
+
+    if(alpha != -1.0 && (alpha < 0.0 || alpha > 1.0)){
+        cerr<<"ERROR: alpha must be -1 or a floating-point value in [0,1]"<<endl;
+        return 1;
+    }
+
+    if(tslice <= 0){
+        cerr<<"ERROR: tslice must be a positive integer"<<endl;
         return 1;
     }
 
