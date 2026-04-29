@@ -355,10 +355,11 @@ int main(int argc, char* argv[]) {
     cout<<"<<< PROJECT SIMULATIONS"<<endl;
 
     Simulator sim(processes, tcs, tslice, alpha, lambda);
-    sim.runSim(simulator::SRT);
-    sim.runSim(simulator::RR);
+    sim.runSim(simulator::FCFS);
+    // sim.runSim(simulator::SRT);
+    // sim.runSim(simulator::RR);
 
-    writeSimout(processes, cpuBoundCount, alpha, sim.getSRTStats(), sim.getRRStats());
+    // writeSimout(processes, cpuBoundCount, alpha, sim.getSRTStats(), sim.getRRStats());
 
     return 0;
 }
