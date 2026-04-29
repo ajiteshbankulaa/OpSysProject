@@ -85,9 +85,11 @@ void writeAlgorithmStats(ofstream& simout, const string& algorithm, const simula
     simout<<"-- CPU-bound number of preemptions: "<<stats.cpuBoundPreemptions<<endl;
     simout<<"-- I/O-bound number of preemptions: "<<stats.ioBoundPreemptions<<endl;
     simout<<"-- overall number of preemptions: "<<stats.overallPreemptions<<endl;
-    simout<<"-- CPU-bound percentage of CPU bursts completed within one time slice: "<<stats.cpuBoundOneSlicePercent<<"%"<<endl;
-    simout<<"-- I/O-bound percentage of CPU bursts completed within one time slice: "<<stats.ioBoundOneSlicePercent<<"%"<<endl;
-    simout<<"-- overall percentage of CPU bursts completed within one time slice: "<<stats.overallOneSlicePercent<<"%"<<endl;
+    if (algorithm == "RR") {
+        simout<<"-- CPU-bound percentage of CPU bursts completed within one time slice: "<<stats.cpuBoundOneSlicePercent<<"%"<<endl;
+        simout<<"-- I/O-bound percentage of CPU bursts completed within one time slice: "<<stats.ioBoundOneSlicePercent<<"%"<<endl;
+        simout<<"-- overall percentage of CPU bursts completed within one time slice: "<<stats.overallOneSlicePercent<<"%"<<endl;
+    }
 }
 
 
@@ -97,7 +99,8 @@ void writeSimout(const vector<Process>& processes, int cpuBoundCount,
                 const simulator::AlgorithmStats& fcfsStats,
                 const simulator::AlgorithmStats& sjfStats,
                 const simulator::AlgorithmStats& srtStats,
-                const simulator::AlgorithmStats& rrStats)
+                const simulator::AlgorithmStats& rrStats,
+                double alpha)
 {
     //open fil
     ofstream simout("simout.txt");
@@ -172,9 +175,9 @@ void writeSimout(const vector<Process>& processes, int cpuBoundCount,
     
     writeAlgorithmStats(simout, "FCFS", fcfsStats);
     simout<<endl;
-    writeAlgorithmStats(simout, "SJF", sjfStats);
+    writeAlgorithmStats(simout, alpha == -1.0 ? "SJF-OPT" : "SJF", sjfStats);
     simout<<endl;
-    writeAlgorithmStats(simout, "SRT", srtStats);
+    writeAlgorithmStats(simout, alpha == -1.0 ? "SRT-OPT" : "SRT", srtStats);
     simout<<endl;
     writeAlgorithmStats(simout, "RR", rrStats);
     simout<<endl;
@@ -350,7 +353,7 @@ int main(int argc, char* argv[]) {
     sim.runSim(simulator::SRT);
     sim.runSim(simulator::RR);
 
-    writeSimout(processes, cpuBoundCount, sim.getFCFSStats(), sim.getSJFStats(), sim.getSRTStats(), sim.getRRStats());
+    writeSimout(processes, cpuBoundCount, sim.getFCFSStats(), sim.getSJFStats(), sim.getSRTStats(), sim.getRRStats(), alpha);
 
     return 0;
 }

@@ -203,17 +203,18 @@ class Simulator {
             int nextProcess = -1;
             int cpuStartTime = -1;
             int contextSwitchCompleteTime = -1;
-            int lastRunningProcess = -1;
+            int switchOutCompleteTime = 0;
 
             long long cpuBusyTime = 0;
 
             long long cpuBoundWaitTotal = 0, ioBoundWaitTotal = 0;
             long long cpuBoundTurnaroundTotal = 0, ioBoundTurnaroundTotal = 0;
+            long long cpuBoundCpuBusyTime = 0, ioBoundCpuBusyTime = 0;
 
             int cpuBoundBurstCount = 0, ioBoundBurstCount = 0;
             int cpuBoundOneSliceCount = 0, ioBoundOneSliceCount = 0;
 
-            std::string algoName = is_sjf ? "SJF" : "FCFS";
+            std::string algoName = is_sjf ? (alpha == -1.0 ? "SJF-OPT" : "SJF") : "FCFS";
 
             std::cout << "time 0ms: Simulator started for " << algoName
                     << " " << formatQueueVec(readyQueue, runtime) << std::endl;
@@ -232,13 +233,15 @@ class Simulator {
 
                         // Turnaround time
                         long long turnaround =
-                            timeMS - running.readyQueueEnterTime;
+                            timeMS + tcs / 2 - running.currentBurstReadyTime;
 
                         if (running.process.isIoBound()) {
+                            ioBoundCpuBusyTime += elapsed;
                             ioBoundTurnaroundTotal += turnaround;
                             ioBoundBurstCount++;
                             ioBoundOneSliceCount++;
                         } else {
+                            cpuBoundCpuBusyTime += elapsed;
                             cpuBoundTurnaroundTotal += turnaround;
                             cpuBoundBurstCount++;
                             cpuBoundOneSliceCount++;
@@ -273,7 +276,7 @@ class Simulator {
                             running.cpuBurstIndex++;
                         }
 
-                        lastRunningProcess = currentProcess;
+                        switchOutCompleteTime = timeMS + tcs / 2;
                         currentProcess = -1;
                         cpuStartTime = -1;
                     }
@@ -294,17 +297,6 @@ class Simulator {
                             cpuBursts[running.cpuBurstIndex];
                     }
 
-                    // Wait time
-                    long long wait =
-                        timeMS - running.readyQueueEnterTime;
-
-                    if (running.process.isIoBound()) {
-                        ioBoundWaitTotal += wait;
-                    } else {
-                        cpuBoundWaitTotal += wait;
-
-                    }
-
                     cpuStartTime = timeMS;
 
                     std::cout << "time " << timeMS << "ms: Process "
@@ -321,6 +313,7 @@ class Simulator {
 
                         readyQueue.push_back(idx);
                         runtime[idx].readyQueueEnterTime = timeMS;
+                        runtime[idx].currentBurstReadyTime = timeMS;
 
                         std::cout << "time " << timeMS << "ms: Process "
                                 << runtime[idx].process.getId()
@@ -338,6 +331,7 @@ class Simulator {
                         runtime[i].arrived = true;
                         readyQueue.push_back(i);
                         runtime[i].readyQueueEnterTime = timeMS;
+                        runtime[i].currentBurstReadyTime = timeMS;
 
                         std::cout << "time " << timeMS << "ms: Process "
                                 << runtime[i].process.getId()
@@ -351,18 +345,21 @@ class Simulator {
                     if (is_sjf) {
                         std::sort(readyQueue.begin(), readyQueue.end(),
                         [runtime](int a, int b) {
-                            return runtime[a].process.getCpuBursts()[runtime[a].cpuBurstIndex] < runtime[b].process.getCpuBursts()[runtime[b].cpuBurstIndex];
+                            int aBurst = runtime[a].process.getCpuBursts()[runtime[a].cpuBurstIndex];
+                            int bBurst = runtime[b].process.getCpuBursts()[runtime[b].cpuBurstIndex];
+                            if (aBurst != bBurst) {
+                                return aBurst < bBurst;
+                            }
+                            return runtime[a].process.getId() < runtime[b].process.getId();
                         }                       
                     ); // normal sort
-                    } else {
-                        std::sort(readyQueue.begin(), readyQueue.end()); // normal sort
                     }
 
                     nextProcess = readyQueue.front();
                     readyQueue.erase(readyQueue.begin());
 
                     contextSwitchCompleteTime =
-                        timeMS + (lastRunningProcess == -1 ? tcs / 2 : tcs);
+                        std::max<long long>(timeMS, switchOutCompleteTime) + tcs / 2;
                 }
 
                 if (terminatedCount == runtime.size()) break;
@@ -375,6 +372,8 @@ class Simulator {
             stats.ioBoundContextSwitches = ioBoundBurstCount;
             stats.overallContextSwitches =
                 cpuBoundBurstCount + ioBoundBurstCount;
+            cpuBoundWaitTotal = cpuBoundTurnaroundTotal - cpuBoundCpuBusyTime - static_cast<long long>(stats.cpuBoundContextSwitches) * tcs;
+            ioBoundWaitTotal = ioBoundTurnaroundTotal - ioBoundCpuBusyTime - static_cast<long long>(stats.ioBoundContextSwitches) * tcs;
 
             stats.cpuUtilization =
                 percent(cpuBusyTime, timeMS);
@@ -434,6 +433,7 @@ class Simulator {
 
             long long cpuBoundWaitTotal = 0, ioBoundWaitTotal = 0;
             long long cpuBoundTurnaroundTotal = 0, ioBoundTurnaroundTotal = 0;
+            long long cpuBoundCpuBusyTime = 0, ioBoundCpuBusyTime = 0;
             int cpuBoundBurstCount = 0, ioBoundBurstCount = 0;
 
             bool isOpt = (alpha == -1.0);
@@ -458,9 +458,11 @@ class Simulator {
                         running.remainingPredicted = 0;
 
                         if (running.process.isIoBound()) {
+                            ioBoundCpuBusyTime += elapsed;
                             ioBoundBurstCount++;
                             ioBoundTurnaroundTotal += turnaroundTime;
                         } else {
+                            cpuBoundCpuBusyTime += elapsed;
                             cpuBoundBurstCount++;
                             cpuBoundTurnaroundTotal += turnaroundTime;
                         }
@@ -587,6 +589,11 @@ class Simulator {
                                 rp.process.getId() < running.process.getId())) {
 
                                 cpuBusyTime += elapsed;
+                                if (running.process.isIoBound()) {
+                                    ioBoundCpuBusyTime += elapsed;
+                                } else {
+                                    cpuBoundCpuBusyTime += elapsed;
+                                }
                                 running.remainingCpuTime  -= elapsed;
                                 running.remainingPredicted = runRemPred;
 
@@ -655,6 +662,11 @@ class Simulator {
                                 runtime[i].process.getId() < running.process.getId())) {
 
                                 cpuBusyTime += elapsed;
+                                if (running.process.isIoBound()) {
+                                    ioBoundCpuBusyTime += elapsed;
+                                } else {
+                                    cpuBoundCpuBusyTime += elapsed;
+                                }
                                 running.remainingCpuTime  -= elapsed;
                                 running.remainingPredicted = runRemPred;
 
@@ -722,6 +734,8 @@ class Simulator {
             srtStats.ioBoundContextSwitches  = ioBoundBurstCount  + srtStats.ioBoundPreemptions;
             srtStats.overallContextSwitches  = srtStats.cpuBoundContextSwitches + srtStats.ioBoundContextSwitches;
             srtStats.overallPreemptions      = srtStats.cpuBoundPreemptions + srtStats.ioBoundPreemptions;
+            cpuBoundWaitTotal = cpuBoundTurnaroundTotal - cpuBoundCpuBusyTime - static_cast<long long>(srtStats.cpuBoundContextSwitches) * tcs;
+            ioBoundWaitTotal = ioBoundTurnaroundTotal - ioBoundCpuBusyTime - static_cast<long long>(srtStats.ioBoundContextSwitches) * tcs;
             srtStats.cpuUtilization          = percent(cpuBusyTime, lastEventTime);
             srtStats.cpuBoundAverageWait     = average(cpuBoundWaitTotal, cpuBoundBurstCount);
             srtStats.ioBoundAverageWait      = average(ioBoundWaitTotal,  ioBoundBurstCount);
