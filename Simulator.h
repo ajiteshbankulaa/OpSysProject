@@ -102,7 +102,7 @@ class Simulator {
 
         std::string formatQueue(const std::queue<int>& readyQueue, const std::vector<RuntimeProcess>& runtime) const {
             if (readyQueue.empty()) {
-                return "[Q:-]";
+                return "[Q: -]";
             }
 
             std::queue<int> copy = readyQueue;
@@ -210,6 +210,7 @@ class Simulator {
             int cpuStartTime = -1;
             int contextSwitchCompleteTime = -1;
             int switchOutCompleteTime = 0;
+            const int eventPrintCutoff = 10000;
 
             long long cpuBusyTime = 0;
 
@@ -264,19 +265,23 @@ class Simulator {
                                     << running.process.getId() << " terminated "
                                     << formatQueueVec(readyQueue, runtime) << std::endl;
                         } else {
-                            std::cout << "time " << timeMS << "ms: Process "
-                                    << running.process.getId() << " completed a CPU burst; "
-                                    << burstsLeft << (burstsLeft == 1 ? " burst" : " bursts")
-                                    << " to go " << formatQueueVec(readyQueue, runtime) << std::endl;
+                            if (timeMS < eventPrintCutoff) {
+                                std::cout << "time " << timeMS << "ms: Process "
+                                        << running.process.getId() << " completed a CPU burst; "
+                                        << burstsLeft << (burstsLeft == 1 ? " burst" : " bursts")
+                                        << " to go " << formatQueueVec(readyQueue, runtime) << std::endl;
+                            }
 
                             int ioCompletionTime =
                                 timeMS + ioBursts[running.cpuBurstIndex] + tcs / 2;
 
-                            std::cout << "time " << timeMS << "ms: Process "
-                                    << running.process.getId()
-                                    << " switching out of CPU; blocking on I/O until time "
-                                    << ioCompletionTime << "ms "
-                                    << formatQueueVec(readyQueue, runtime) << std::endl;
+                            if (timeMS < eventPrintCutoff) {
+                                std::cout << "time " << timeMS << "ms: Process "
+                                        << running.process.getId()
+                                        << " switching out of CPU; blocking on I/O until time "
+                                        << ioCompletionTime << "ms "
+                                        << formatQueueVec(readyQueue, runtime) << std::endl;
+                            }
 
                             if (is_sjf && alpha != -1.0) {
                                 running.tau = static_cast<int>(ceil(alpha * cpuBursts[running.cpuBurstIndex] + (1.0 - alpha) * running.tau));
@@ -308,11 +313,13 @@ class Simulator {
 
                     cpuStartTime = timeMS;
 
-                    std::cout << "time " << timeMS << "ms: Process "
-                            << running.process.getId()
-                            << " started using the CPU for "
-                            << running.remainingCpuTime << "ms burst "
-                            << formatQueueVec(readyQueue, runtime) << std::endl;
+                    if (timeMS < eventPrintCutoff) {
+                        std::cout << "time " << timeMS << "ms: Process "
+                                << running.process.getId()
+                                << " started using the CPU for "
+                                << running.remainingCpuTime << "ms burst "
+                                << formatQueueVec(readyQueue, runtime) << std::endl;
+                    }
                 }
 
                 for (size_t i = 0; i < ioCompletions.size();) {
@@ -324,10 +331,12 @@ class Simulator {
                         runtime[idx].readyQueueEnterTime = timeMS;
                         runtime[idx].currentBurstReadyTime = timeMS;
 
-                        std::cout << "time " << timeMS << "ms: Process "
-                                << runtime[idx].process.getId()
-                                << " completed I/O; added to ready queue "
-                                << formatQueueVec(readyQueue, runtime) << std::endl;
+                        if (timeMS < eventPrintCutoff) {
+                            std::cout << "time " << timeMS << "ms: Process "
+                                    << runtime[idx].process.getId()
+                                    << " completed I/O; added to ready queue "
+                                    << formatQueueVec(readyQueue, runtime) << std::endl;
+                        }
                     } else {
                         i++;
                     }
@@ -342,10 +351,12 @@ class Simulator {
                         runtime[i].readyQueueEnterTime = timeMS;
                         runtime[i].currentBurstReadyTime = timeMS;
 
-                        std::cout << "time " << timeMS << "ms: Process "
-                                << runtime[i].process.getId()
-                                << " arrived; added to ready queue "
-                                << formatQueueVec(readyQueue, runtime) << std::endl;
+                        if (timeMS < eventPrintCutoff) {
+                            std::cout << "time " << timeMS << "ms: Process "
+                                    << runtime[i].process.getId()
+                                    << " arrived; added to ready queue "
+                                    << formatQueueVec(readyQueue, runtime) << std::endl;
+                        }
                     }
                 }
 
@@ -440,6 +451,7 @@ class Simulator {
             int cpuBusyTime = 0;
             int lastEventTime = 0;
             int switchOutCompleteTime = 0;
+            const int eventPrintCutoff = 10000;
 
             long long cpuBoundWaitTotal = 0, ioBoundWaitTotal = 0;
             long long cpuBoundTurnaroundTotal = 0, ioBoundTurnaroundTotal = 0;
@@ -487,26 +499,32 @@ class Simulator {
                                     << running.process.getId() << " terminated "
                                     << formatQueueVec(readyQueue, runtime) << std::endl;
                         } else {
-                            std::cout << "time " << timeMS << "ms: Process "
-                                    << running.process.getId() << " completed a CPU burst; "
-                                    << burstsLeft << (burstsLeft == 1 ? " burst" : " bursts")
-                                    << " to go " << formatQueueVec(readyQueue, runtime) << std::endl;
+                            if (timeMS < eventPrintCutoff) {
+                                std::cout << "time " << timeMS << "ms: Process "
+                                        << running.process.getId() << " completed a CPU burst; "
+                                        << burstsLeft << (burstsLeft == 1 ? " burst" : " bursts")
+                                        << " to go " << formatQueueVec(readyQueue, runtime) << std::endl;
+                            }
 
                             //recalculate tau
                             if (!isOpt) {
                                 int newTau = static_cast<int>(ceil(alpha * actualBurst + (1.0 - alpha) * running.tau));
                                 running.tau = newTau;
-                                std::cout << "time " << timeMS << "ms: Recalculated tau for process "
-                                        << running.process.getId() << " to " << newTau << "ms "
-                                        << formatQueueVec(readyQueue, runtime) << std::endl;
+                                if (timeMS < eventPrintCutoff) {
+                                    std::cout << "time " << timeMS << "ms: Recalculated tau for process "
+                                            << running.process.getId() << " to " << newTau << "ms "
+                                            << formatQueueVec(readyQueue, runtime) << std::endl;
+                                }
                             }
 
                             int ioCompletionTime = timeMS + ioBursts[running.cpuBurstIndex] + tcs / 2;
-                            std::cout << "time " << timeMS << "ms: Process "
-                                    << running.process.getId()
-                                    << " switching out of CPU; blocking on I/O until time "
-                                    << ioCompletionTime << "ms "
-                                    << formatQueueVec(readyQueue, runtime) << std::endl;
+                            if (timeMS < eventPrintCutoff) {
+                                std::cout << "time " << timeMS << "ms: Process "
+                                        << running.process.getId()
+                                        << " switching out of CPU; blocking on I/O until time "
+                                        << ioCompletionTime << "ms "
+                                        << formatQueueVec(readyQueue, runtime) << std::endl;
+                            }
 
                             ioCompletions.push_back({ioCompletionTime, currentProcess});
                             std::sort(ioCompletions.begin(), ioCompletions.end());
@@ -538,7 +556,7 @@ class Simulator {
 
                     bool isFull = (running.remainingCpuTime == fullBurst);
 
-                    if (!isOpt) {
+                    if (timeMS < eventPrintCutoff && !isOpt) {
                         if (isFull)
                             std::cout << "time " << timeMS << "ms: Process " << running.process.getId()
                                     << " (tau " << running.tau << "ms) started using the CPU for "
@@ -549,7 +567,7 @@ class Simulator {
                                     << " (tau " << running.tau << "ms) started using the CPU for remaining "
                                     << running.remainingCpuTime << "ms of " << fullBurst << "ms burst "
                                     << formatQueueVec(readyQueue, runtime) << std::endl;
-                    } else {
+                    } else if (timeMS < eventPrintCutoff) {
                         if (isFull)
                             std::cout << "time " << timeMS << "ms: Process " << running.process.getId()
                                     << " started using the CPU for " << fullBurst << "ms burst "
@@ -650,11 +668,11 @@ class Simulator {
 
                         if (!didPreempt) {
                             srtEnqueue(idx, timeMS, readyQueue, runtime);
-                            if (!isOpt)
+                            if (timeMS < eventPrintCutoff && !isOpt)
                                 std::cout << "time " << timeMS << "ms: Process " << rp.process.getId()
                                         << " (tau " << rp.tau << "ms) completed I/O; added to ready queue "
                                         << formatQueueVec(readyQueue, runtime) << std::endl;
-                            else
+                            else if (timeMS < eventPrintCutoff)
                                 std::cout << "time " << timeMS << "ms: Process " << rp.process.getId()
                                         << " completed I/O; added to ready queue "
                                         << formatQueueVec(readyQueue, runtime) << std::endl;
@@ -725,12 +743,12 @@ class Simulator {
 
                         if (!didPreempt) {
                             srtEnqueue(static_cast<int>(i), timeMS, readyQueue, runtime);
-                            if (!isOpt)
+                            if (timeMS < eventPrintCutoff && !isOpt)
                                 std::cout << "time " << timeMS << "ms: Process "
                                         << runtime[i].process.getId()
                                         << " (tau " << runtime[i].tau << "ms) arrived; added to ready queue "
                                         << formatQueueVec(readyQueue, runtime) << std::endl;
-                            else
+                            else if (timeMS < eventPrintCutoff)
                                 std::cout << "time " << timeMS << "ms: Process "
                                         << runtime[i].process.getId()
                                         << " arrived; added to ready queue "

@@ -53,9 +53,9 @@ void printProcess(const Process& p) {
     const vector<int>& cpu = p.getCpuBursts();
 
     if (p.isIoBound()){
-        cout<<"I/O-bound process "<<p.getId()<<": arrival time "<<p.getArrivalTime()<<"ms; "<<cpu.size()<<" "<<(cpu.size() == 1 ? "CPU burst" : "CPU bursts")<<":"<<endl;
+        cout<<"I/O-bound process "<<p.getId()<<": arrival time "<<p.getArrivalTime()<<"ms; "<<cpu.size()<<" "<<(cpu.size() == 1 ? "CPU burst" : "CPU bursts")<<endl;
     }else{
-        cout<<"CPU-bound process "<<p.getId()<<": arrival time "<<p.getArrivalTime()<<"ms; "<<cpu.size()<<" "<<(cpu.size() == 1 ? "CPU burst" : "CPU bursts")<<":"<<endl;
+        cout<<"CPU-bound process "<<p.getId()<<": arrival time "<<p.getArrivalTime()<<"ms; "<<cpu.size()<<" "<<(cpu.size() == 1 ? "CPU burst" : "CPU bursts")<<endl;
     }
 }
 
