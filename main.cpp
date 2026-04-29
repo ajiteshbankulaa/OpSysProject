@@ -144,10 +144,13 @@ int main(int argc, char* argv[]) {
     argv[3] - the third arg is the seed for the rng
     argv[4] - the fourth arg is the lambda for the exp dist
     argv[5] - the fifth arg is the upper bound for valid random numbers for exp distribution
+    argv[6] - the sixth arg is the time in milliseconds it takes to perform a context switch.
+    argv[7] - the seventh arg is for the SJF and SRT algorithms, since we do not know the actual CPU burst times beforehand, we will rely on estimates calculated via exponential averaging. This command-line argument is the constant α
+    argv[8] - the eighth arg is  For the RR algorithm, define the time slice value, tslice, measured in milliseconds. Require tslice to be a positive integer
     */
 
     // need exactly 5 user args + the program name so err if not 
-    if (argc != 6) {
+    if (argc != 9) {
         cerr<<"ERROR: wrong number of arguments"<<endl;
         return 1;
     }
