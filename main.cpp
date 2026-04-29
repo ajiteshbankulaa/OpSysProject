@@ -317,7 +317,7 @@ int main(int argc, char* argv[]) {
     if (alpha == -1.0) {
         cout<<"<n/a>";
     } else {
-        cout<<defaultfloat<<alpha;
+        cout<<fixed<<setprecision(2)<<alpha;
     }
     cout<<"; t_slice="<<tslice<<"ms"<<endl<<endl;
 

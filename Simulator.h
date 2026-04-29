@@ -186,6 +186,29 @@ class Simulator {
             readyQueue.insert(it, processIndex);
         }
 
+        void sjfEnqueue(
+            int processIndex,
+            int timeMS,
+            std::vector<int>& readyQueue,
+            std::vector<RuntimeProcess>& runtime,
+            bool isOpt
+        ) {
+            runtime[processIndex].readyQueueEnterTime = timeMS;
+            runtime[processIndex].currentBurstReadyTime = timeMS;
+            readyQueue.push_back(processIndex);
+
+            std::sort(readyQueue.begin(), readyQueue.end(),
+                [&runtime, isOpt](int a, int b) {
+                    int aBurst = isOpt ? runtime[a].process.getCpuBursts()[runtime[a].cpuBurstIndex] : runtime[a].tau;
+                    int bBurst = isOpt ? runtime[b].process.getCpuBursts()[runtime[b].cpuBurstIndex] : runtime[b].tau;
+                    if (aBurst != bBurst) {
+                        return aBurst < bBurst;
+                    }
+                    return runtime[a].process.getId() < runtime[b].process.getId();
+                }
+            );
+        }
+
         void runFCFS(bool is_sjf = false) {
             std::vector<RuntimeProcess> runtime;
             for (const Process& p : processes) {
@@ -222,6 +245,8 @@ class Simulator {
             int cpuBoundOneSliceCount = 0, ioBoundOneSliceCount = 0;
 
             std::string algoName = is_sjf ? (alpha == -1.0 ? "SJF-OPT" : "SJF") : "FCFS";
+            bool sjfUsesTau = is_sjf && alpha != -1.0;
+            bool sjfIsOpt = is_sjf && alpha == -1.0;
 
             std::cout << "time 0ms: Simulator started for " << algoName
                     << " " << formatQueueVec(readyQueue, runtime) << std::endl;
@@ -267,13 +292,27 @@ class Simulator {
                         } else {
                             if (timeMS < eventPrintCutoff) {
                                 std::cout << "time " << timeMS << "ms: Process "
-                                        << running.process.getId() << " completed a CPU burst; "
+                                        << running.process.getId();
+                                if (sjfUsesTau) {
+                                    std::cout << " (tau " << running.tau << "ms)";
+                                }
+                                std::cout << " completed a CPU burst; "
                                         << burstsLeft << (burstsLeft == 1 ? " burst" : " bursts")
                                         << " to go " << formatQueueVec(readyQueue, runtime) << std::endl;
                             }
 
                             int ioCompletionTime =
                                 timeMS + ioBursts[running.cpuBurstIndex] + tcs / 2;
+
+                            if (sjfUsesTau) {
+                                int newTau = static_cast<int>(ceil(alpha * cpuBursts[running.cpuBurstIndex] + (1.0 - alpha) * running.tau));
+                                running.tau = newTau;
+                                if (timeMS < eventPrintCutoff) {
+                                    std::cout << "time " << timeMS << "ms: Recalculated tau for process "
+                                            << running.process.getId() << " to " << newTau << "ms "
+                                            << formatQueueVec(readyQueue, runtime) << std::endl;
+                                }
+                            }
 
                             if (timeMS < eventPrintCutoff) {
                                 std::cout << "time " << timeMS << "ms: Process "
@@ -283,9 +322,6 @@ class Simulator {
                                         << formatQueueVec(readyQueue, runtime) << std::endl;
                             }
 
-                            if (is_sjf && alpha != -1.0) {
-                                running.tau = static_cast<int>(ceil(alpha * cpuBursts[running.cpuBurstIndex] + (1.0 - alpha) * running.tau));
-                            }
                             ioCompletions.push_back({ioCompletionTime, currentProcess});
                             running.cpuBurstIndex++;
                         }
@@ -315,8 +351,11 @@ class Simulator {
 
                     if (timeMS < eventPrintCutoff) {
                         std::cout << "time " << timeMS << "ms: Process "
-                                << running.process.getId()
-                                << " started using the CPU for "
+                                << running.process.getId();
+                        if (sjfUsesTau) {
+                            std::cout << " (tau " << running.tau << "ms)";
+                        }
+                        std::cout << " started using the CPU for "
                                 << running.remainingCpuTime << "ms burst "
                                 << formatQueueVec(readyQueue, runtime) << std::endl;
                     }
@@ -327,14 +366,21 @@ class Simulator {
                         int idx = ioCompletions[i].second;
                         ioCompletions.erase(ioCompletions.begin() + i);
 
-                        readyQueue.push_back(idx);
-                        runtime[idx].readyQueueEnterTime = timeMS;
-                        runtime[idx].currentBurstReadyTime = timeMS;
+                        if (is_sjf) {
+                            sjfEnqueue(idx, timeMS, readyQueue, runtime, sjfIsOpt);
+                        } else {
+                            readyQueue.push_back(idx);
+                            runtime[idx].readyQueueEnterTime = timeMS;
+                            runtime[idx].currentBurstReadyTime = timeMS;
+                        }
 
                         if (timeMS < eventPrintCutoff) {
                             std::cout << "time " << timeMS << "ms: Process "
-                                    << runtime[idx].process.getId()
-                                    << " completed I/O; added to ready queue "
+                                    << runtime[idx].process.getId();
+                            if (sjfUsesTau) {
+                                std::cout << " (tau " << runtime[idx].tau << "ms)";
+                            }
+                            std::cout << " completed I/O; added to ready queue "
                                     << formatQueueVec(readyQueue, runtime) << std::endl;
                         }
                     } else {
@@ -347,14 +393,21 @@ class Simulator {
                         runtime[i].process.getArrivalTime() == timeMS) {
 
                         runtime[i].arrived = true;
-                        readyQueue.push_back(i);
-                        runtime[i].readyQueueEnterTime = timeMS;
-                        runtime[i].currentBurstReadyTime = timeMS;
+                        if (is_sjf) {
+                            sjfEnqueue(static_cast<int>(i), timeMS, readyQueue, runtime, sjfIsOpt);
+                        } else {
+                            readyQueue.push_back(i);
+                            runtime[i].readyQueueEnterTime = timeMS;
+                            runtime[i].currentBurstReadyTime = timeMS;
+                        }
 
                         if (timeMS < eventPrintCutoff) {
                             std::cout << "time " << timeMS << "ms: Process "
-                                    << runtime[i].process.getId()
-                                    << " arrived; added to ready queue "
+                                    << runtime[i].process.getId();
+                            if (sjfUsesTau) {
+                                std::cout << " (tau " << runtime[i].tau << "ms)";
+                            }
+                            std::cout << " arrived; added to ready queue "
                                     << formatQueueVec(readyQueue, runtime) << std::endl;
                         }
                     }
@@ -396,7 +449,7 @@ class Simulator {
             ioBoundWaitTotal = ioBoundTurnaroundTotal - ioBoundCpuBusyTime - static_cast<long long>(stats.ioBoundContextSwitches) * tcs;
 
             stats.cpuUtilization =
-                percent(cpuBusyTime, timeMS);
+                percent(cpuBusyTime, timeMS + tcs / 2);
 
             stats.cpuBoundAverageWait =
                 average(cpuBoundWaitTotal, cpuBoundBurstCount);
