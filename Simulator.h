@@ -53,6 +53,7 @@ class Simulator {
                 case simulator::SRT: runSRT(); break;
                 case simulator::RR:  runRR();  break;
                 case simulator::FCFS: runFCFS(); break;
+                case simulator::SJF: runFCFS(true); break;
                 default: break;
             }
         }
@@ -66,6 +67,10 @@ class Simulator {
         simulator::AlgorithmStats getFCFSStats() const {
             return fcfsStats;
         }
+        simulator::AlgorithmStats getSJFStats() const {
+            return sjfStats;
+        }
+
 
         
     private:
@@ -87,6 +92,7 @@ class Simulator {
         int tcs = 0;
         int tslice = 0;
         simulator::AlgorithmStats fcfsStats;
+        simulator::AlgorithmStats sjfStats;
         simulator::AlgorithmStats rrStats;
         double alpha = 0.0;
         double lambda = 0.0;
@@ -178,7 +184,7 @@ class Simulator {
             readyQueue.insert(it, processIndex);
         }
 
-        void runFCFS() {
+        void runFCFS(bool is_sjf = false) {
             std::vector<RuntimeProcess> runtime;
             for (const Process& p : processes) {
                 runtime.push_back(RuntimeProcess(p));
@@ -186,6 +192,8 @@ class Simulator {
 
             std::vector<int> readyQueue;
             std::vector<std::pair<int,int>> ioCompletions;
+
+            simulator::AlgorithmStats & stats = is_sjf ? sjfStats : fcfsStats;
 
             long long timeMS = 0;
             unsigned int terminatedCount = 0;
@@ -203,7 +211,7 @@ class Simulator {
             int cpuBoundBurstCount = 0, ioBoundBurstCount = 0;
             int cpuBoundOneSliceCount = 0, ioBoundOneSliceCount = 0;
 
-            std::string algoName = "FCFS";
+            std::string algoName = is_sjf ? "SJF" : "FCFS";
 
             std::cout << "time 0ms: Simulator started for " << algoName
                     << " " << formatQueueVec(readyQueue, runtime) << std::endl;
@@ -337,6 +345,17 @@ class Simulator {
                 }
 
                 if (currentProcess == -1 && nextProcess == -1 && !readyQueue.empty()) {
+                    // Sort ready queue
+                    if (is_sjf) {
+                        std::sort(readyQueue.begin(), readyQueue.end(),
+                        [runtime](int a, int b) {
+                            return runtime[a].process.getCpuBursts()[runtime[a].cpuBurstIndex] < runtime[b].process.getCpuBursts()[runtime[b].cpuBurstIndex];
+                        }                       
+                    ); // normal sort
+                    } else {
+                        std::sort(readyQueue.begin(), readyQueue.end()); // normal sort
+                    }
+
                     nextProcess = readyQueue.front();
                     readyQueue.erase(readyQueue.begin());
 
@@ -348,37 +367,37 @@ class Simulator {
 
             } while (++timeMS);
 
-            fcfsStats.overallPreemptions = 0;
+            stats.overallPreemptions = 0;
 
-            fcfsStats.cpuBoundContextSwitches = cpuBoundBurstCount;
-            fcfsStats.ioBoundContextSwitches = ioBoundBurstCount;
-            fcfsStats.overallContextSwitches =
+            stats.cpuBoundContextSwitches = cpuBoundBurstCount;
+            stats.ioBoundContextSwitches = ioBoundBurstCount;
+            stats.overallContextSwitches =
                 cpuBoundBurstCount + ioBoundBurstCount;
 
-            fcfsStats.cpuUtilization =
+            stats.cpuUtilization =
                 percent(cpuBusyTime, timeMS);
 
-            fcfsStats.cpuBoundAverageWait =
+            stats.cpuBoundAverageWait =
                 average(cpuBoundWaitTotal, cpuBoundBurstCount);
-            fcfsStats.ioBoundAverageWait =
+            stats.ioBoundAverageWait =
                 average(ioBoundWaitTotal, ioBoundBurstCount);
-            fcfsStats.overallAverageWait =
+            stats.overallAverageWait =
                 average(cpuBoundWaitTotal + ioBoundWaitTotal,
                         cpuBoundBurstCount + ioBoundBurstCount);
 
-            fcfsStats.cpuBoundAverageTurnaround =
+            stats.cpuBoundAverageTurnaround =
                 average(cpuBoundTurnaroundTotal, cpuBoundBurstCount);
-            fcfsStats.ioBoundAverageTurnaround =
+            stats.ioBoundAverageTurnaround =
                 average(ioBoundTurnaroundTotal, ioBoundBurstCount);
-            fcfsStats.overallAverageTurnaround =
+            stats.overallAverageTurnaround =
                 average(cpuBoundTurnaroundTotal + ioBoundTurnaroundTotal,
                         cpuBoundBurstCount + ioBoundBurstCount);
 
-            fcfsStats.cpuBoundOneSlicePercent =
+            stats.cpuBoundOneSlicePercent =
                 percent(cpuBoundOneSliceCount, cpuBoundBurstCount);
-            fcfsStats.ioBoundOneSlicePercent =
+            stats.ioBoundOneSlicePercent =
                 percent(ioBoundOneSliceCount, ioBoundBurstCount);
-            fcfsStats.overallOneSlicePercent =
+            stats.overallOneSlicePercent =
                 percent(cpuBoundOneSliceCount + ioBoundOneSliceCount,
                         cpuBoundBurstCount + ioBoundBurstCount);
 

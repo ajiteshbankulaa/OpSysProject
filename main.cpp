@@ -93,10 +93,11 @@ void writeAlgorithmStats(ofstream& simout, const string& algorithm, const simula
 
 
 
-void writeSimout(const vector<Process>& processes, int cpuBoundCount, double alpha,
+void writeSimout(const vector<Process>& processes, int cpuBoundCount, double clalpha,
                 const simulator::AlgorithmStats& fcfsStats,
-                 const simulator::AlgorithmStats& srtStats,
-                 const simulator::AlgorithmStats& rrStats)
+                const simulator::AlgorithmStats& sjfStats,
+                const simulator::AlgorithmStats& srtStats,
+                const simulator::AlgorithmStats& rrStats)
 {
     //open fil
     ofstream simout("simout.txt");
@@ -168,9 +169,10 @@ void writeSimout(const vector<Process>& processes, int cpuBoundCount, double alp
     simout<<"-- I/O-bound average I/O burst time: "<<computeAverage(ioBoundIoTotal, ioBoundIoCount)<<" ms"<<endl;
     simout<<"-- overall average I/O burst time: "<<computeAverage(overallIoTotal, overallIoCount)<<" ms"<<endl;
     
-    writeAlgorithmStats(simout, "FCFS", fcfsStats);
-    writeAlgorithmStats(simout, "SRT", srtStats);
-    writeAlgorithmStats(simout, "RR", rrStats);
+    // writeAlgorithmStats(simout, "FCFS", fcfsStats);
+    writeAlgorithmStats(simout, "SJF", sjfStats);
+    // writeAlgorithmStats(simout, "SRT", srtStats);
+    // writeAlgorithmStats(simout, "RR", rrStats);
 }
 
 //generate one  process
@@ -338,10 +340,11 @@ int main(int argc, char* argv[]) {
 
     Simulator sim(processes, tcs, tslice, alpha, lambda);
     sim.runSim(simulator::FCFS);
+    sim.runSim(simulator::SJF);
     sim.runSim(simulator::SRT);
     sim.runSim(simulator::RR);
 
-    writeSimout(processes, cpuBoundCount, alpha, sim.getFCFSStats(), sim.getSRTStats(), sim.getRRStats());
+    writeSimout(processes, cpuBoundCount, alpha, sim.getFCFSStats(), sim.getSJFStats(), sim.getSRTStats(), sim.getRRStats());
 
     return 0;
 }
