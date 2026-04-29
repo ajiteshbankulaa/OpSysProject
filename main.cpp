@@ -168,6 +168,7 @@ void writeSimout(const vector<Process>& processes, int cpuBoundCount,
     simout<<"-- CPU-bound average I/O burst time: "<<computeAverage(cpuBoundIoTotal, cpuBoundIoCount)<<" ms"<<endl;
     simout<<"-- I/O-bound average I/O burst time: "<<computeAverage(ioBoundIoTotal, ioBoundIoCount)<<" ms"<<endl;
     simout<<"-- overall average I/O burst time: "<<computeAverage(overallIoTotal, overallIoCount)<<" ms"<<endl;
+    simout<<endl;
     
     writeAlgorithmStats(simout, "FCFS", fcfsStats);
     simout<<endl;
